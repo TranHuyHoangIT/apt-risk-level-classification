@@ -13,8 +13,8 @@ import platform
 routes = Blueprint('routes', __name__)
 
 # ====== LOAD SCALER, LABEL_ENCODER ======
-scaler = joblib.load('scaler.pkl')
-label_encoder = joblib.load('label_encoder.pkl')
+scaler = joblib.load('model_trained/scaler.pkl')
+label_encoder = joblib.load('model_trained/label_encoder.pkl')
 
 # ====== MODEL ======
 class APTLSTM(nn.Module):
@@ -31,7 +31,7 @@ class APTLSTM(nn.Module):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 input_dim = scaler.n_features_in_
 model = APTLSTM(input_dim).to(device)
-model.load_state_dict(torch.load('lstm_dsrl.pth', map_location=device))
+model.load_state_dict(torch.load('model_trained/lstm_dsrl.pth', map_location=device))
 model.eval()
 
 # ====== COLUMN MAPPING FOR CICFlowMeter CSV ======
