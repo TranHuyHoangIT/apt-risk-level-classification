@@ -17,6 +17,15 @@ export const uploadLogs = async (file) => {
   }
 };
 
+export const uploadPcap = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await axios.post(`${BASE_URL}/upload-pcap`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
 
 export const getUploadHistory = async () => {
   try {
