@@ -1,20 +1,59 @@
-import { Link } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { ShieldCheck, Upload, List } from 'lucide-react';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, toggleSidebar }) {
   return (
-    <aside className="w-64 bg-gray-100 min-h-screen shadow">
-      <div className="p-4 font-bold text-blue-600">APT Risk</div>
-      <nav className="flex flex-col p-4 space-y-2">
-        <Link to="/" className="flex items-center text-gray-700 hover:bg-blue-100 p-2 rounded">
-          <ShieldCheck className="w-5 h-5 mr-2" /> Dashboard
-        </Link>
-        <Link to="/upload" className="flex items-center text-gray-700 hover:bg-blue-100 p-2 rounded">
-          <Upload className="w-5 h-5 mr-2" /> Upload Logs
-        </Link>
-        <Link to="/upload-history" className="flex items-center text-gray-700 hover:bg-blue-100 p-2 rounded">
-          <List className="w-5 h-5 mr-2" /> Risk Details
-        </Link>
+    <aside
+      className={`fixed left-0 top-0 h-screen w-64 z-50 bg-gradient-to-b from-gray-900 to-gray-800 shadow-xl transition-transform duration-300 ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      } md:translate-x-0`}
+    >
+      {/* Logo */}
+      <div className="p-4 sm:p-6 flex items-center gap-2">
+        <ShieldCheck className="w-8 h-8 text-blue-400" />
+        <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+          APT Risk
+        </span>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex flex-col px-4 py-2 space-y-2">
+        <NavLink
+          to="/dashboard"
+          onClick={() => window.innerWidth < 768 && toggleSidebar()}
+          className={({ isActive }) =>
+            `flex items-center gap-3 p-3 rounded-lg text-gray-200 hover:bg-blue-700 hover:text-white transition-all duration-200 group ${
+              isActive ? 'bg-blue-700 text-white' : ''
+            }`
+          }
+        >
+          <ShieldCheck className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+          Dashboard
+        </NavLink>
+        <NavLink
+          to="/upload"
+          onClick={() => window.innerWidth < 768 && toggleSidebar()}
+          className={({ isActive }) =>
+            `flex items-center gap-3 p-3 rounded-lg text-gray-200 hover:bg-blue-700 hover:text-white transition-all duration-200 group ${
+              isActive ? 'bg-blue-700 text-white' : ''
+            }`
+          }
+        >
+          <Upload className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+          Upload Logs
+        </NavLink>
+        <NavLink
+          to="/upload-history"
+          onClick={() => window.innerWidth < 768 && toggleSidebar()}
+          className={({ isActive }) =>
+            `flex items-center gap-3 p-3 rounded-lg text-gray-200 hover:bg-blue-700 hover:text-white transition-all duration-200 group ${
+              isActive ? 'bg-blue-700 text-white' : ''
+            }`
+          }
+        >
+          <List className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+          Risk Details
+        </NavLink>
       </nav>
     </aside>
   );

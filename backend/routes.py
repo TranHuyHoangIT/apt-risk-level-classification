@@ -1,5 +1,7 @@
 from flask import Blueprint, request, jsonify
-from models import db, Upload, Prediction, RiskSummary
+from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
+from models import db, User, Upload, Prediction, RiskSummary
+import bcrypt
 import torch
 import torch.nn as nn
 import numpy as np
@@ -9,8 +11,12 @@ import os
 import subprocess
 import uuid
 import platform
+from datetime import timedelta
 
 routes = Blueprint('routes', __name__)
+
+# ====== JWT SETUP ======
+jwt = JWTManager()
 
 # ====== LOAD SCALER, LABEL_ENCODER ======
 scaler = joblib.load('model_trained/scaler.pkl')
@@ -164,9 +170,78 @@ def parse_csv_row(row):
         features.append(value)
     return np.array(features)
 
+@routes.route('/login', methods=['POST', 'OPTIONS'])
+def login():
+    print(f"[Login] Handling {request.method} request for /login")
+    if request.method == 'OPTIONS':
+        print("[Login] Returning 200 for OPTIONS /login")
+        return '', 200
+
+    data = request.get_json()
+    print(f"[Login] Request data: {data}")
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        print("[Login] Missing username or password")
+        return jsonify({'error': 'Missing username or password'}), 400
+
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        print(f"[Login] User {username} not found")
+        return jsonify({'error': 'User not found'}), 401
+
+    if not bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+        print(f"[Login] Invalid password for {username}")
+        return jsonify({'error': 'Invalid password'}), 401
+
+    access_token = create_access_token(
+        identity={'user_id': user.id, 'role': user.role},
+        expires_delta=timedelta(days=1)
+    )
+    print(f"[Login] Login successful for {username}")
+    return jsonify({
+        'message': 'Login successful',
+        'access_token': access_token,
+        'user': {'id': user.id, 'username': user.username, 'role': user.role}
+    }), 200
+
+@routes.route('/register', methods=['POST', 'OPTIONS'])
+def register():
+    print(f"[Register] Handling {request.method} request for /register")
+    if request.method == 'OPTIONS':
+        print("[Register] Returning 200 for OPTIONS /register")
+        return '', 200
+
+    data = request.get_json()
+    print(f"[Register] Request data: {data}")
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password')
+
+    if not username or not email or not password:
+        print("[Register] Missing username, email, or password")
+        return jsonify({'error': 'Missing username, email, or password'}), 400
+
+    if User.query.filter_by(username=username).first():
+        print(f"[Register] Username {username} already exists")
+        return jsonify({'error': 'Username already exists'}), 400
+    if User.query.filter_by(email=email).first():
+        print(f"[Register] Email {email} already exists")
+        return jsonify({'error': 'Email already exists'}), 400
+
+    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    user = User(username=username, email=email, password_hash=password_hash, role='user')
+    db.session.add(user)
+    db.session.commit()
+    print(f"[Register] User {username} registered successfully")
+    return jsonify({'message': 'User registered successfully'}), 201
+
 # ====== ROUTE: NHẬN 1 LOG ======
 @routes.route('/predict', methods=['POST'])
+@jwt_required()
 def predict():
+    current_user = get_jwt_identity()
     data = request.get_json()
     if not data or 'log' not in data:
         return jsonify({'error': 'Missing log'}), 400
@@ -188,14 +263,16 @@ def predict():
 
 # ====== ROUTE: NHẬN FILE LOG ======
 @routes.route('/upload-logs', methods=['POST'])
+@jwt_required()
 def upload_logs():
+    current_user = get_jwt_identity()
     if 'file' not in request.files:
         return jsonify({'error': 'Missing file'}), 400
 
     file = request.files['file']
     filename = file.filename
-    save_path = os.path.join('uploads', filename)
-    os.makedirs('uploads', exist_ok=True)
+    save_path = os.path.join('Uploads', filename)
+    os.makedirs('Uploads', exist_ok=True)
     file.save(save_path)
 
     lines = open(save_path, encoding='utf-8').read().strip().split('\n')
@@ -211,7 +288,7 @@ def upload_logs():
     if not feature_list:
         return jsonify({'error': 'Invalid log file'}), 400
 
-    upload = Upload(filename=filename, file_path=save_path)
+    upload = Upload(filename=filename, file_path=save_path, user_id=current_user['user_id'])
     db.session.add(upload)
     db.session.commit()
 
@@ -241,7 +318,9 @@ def upload_logs():
 
 # ====== ROUTE: NHẬN FILE PCAP ======
 @routes.route('/upload-pcap', methods=['POST'])
+@jwt_required()
 def upload_pcap():
+    current_user = get_jwt_identity()
     if 'file' not in request.files:
         return jsonify({'error': 'Missing file'}), 400
 
@@ -250,12 +329,12 @@ def upload_pcap():
         return jsonify({'error': 'Invalid PCAP file'}), 400
 
     pcap_filename = file.filename
-    pcap_save_path = os.path.join('uploads', pcap_filename)
-    os.makedirs('uploads', exist_ok=True)
+    pcap_save_path = os.path.join('Uploads', pcap_filename)
+    os.makedirs('Uploads', exist_ok=True)
     file.save(pcap_save_path)
 
     csv_filename = f"{uuid.uuid4()}.csv"
-    csv_save_path = os.path.join('uploads', csv_filename)
+    csv_save_path = os.path.join('Uploads', csv_filename)
 
     cicflowmeter_dir = os.path.join(os.path.dirname(__file__), 'cicflowmeter')
     venv_activate = os.path.join(cicflowmeter_dir, '.venv', 'bin', 'activate') if platform.system() != 'Windows' else os.path.join(cicflowmeter_dir, '.venv', 'Scripts', 'activate.bat')
@@ -277,7 +356,7 @@ def upload_pcap():
     df = df.rename(columns=column_mapping)
     new_df = pd.DataFrame({col: df.get(col, 0) for col in desired_columns})
 
-    refactored_csv_path = os.path.join('uploads', f"refactored_{csv_filename}")
+    refactored_csv_path = os.path.join('Uploads', f"refactored_{csv_filename}")
     new_df.to_csv(refactored_csv_path, index=False, header=False)
 
     feature_list = [parse_csv_row(row) for _, row in new_df.iterrows()]
@@ -286,7 +365,7 @@ def upload_pcap():
     if not feature_list:
         return jsonify({'error': 'Invalid CSV data'}), 400
 
-    upload = Upload(filename=pcap_filename, file_path=pcap_save_path)
+    upload = Upload(filename=pcap_filename, file_path=pcap_save_path, user_id=current_user['user_id'])
     db.session.add(upload)
     db.session.commit()
 
@@ -320,8 +399,17 @@ def upload_pcap():
 
 # ====== ROUTE LỊCH SỬ LOG ======
 @routes.route('/upload-history', methods=['GET'])
+@jwt_required()
 def upload_history():
-    uploads = Upload.query.order_by(Upload.upload_time.desc()).all()
+    current_user = get_jwt_identity()
+    user_id = current_user['user_id']
+    role = current_user['role']
+
+    if role == 'admin':
+        uploads = Upload.query.order_by(Upload.upload_time.desc()).all()
+    else:
+        uploads = Upload.query.filter_by(user_id=user_id).order_by(Upload.upload_time.desc()).all()
+
     results = [{
         'upload_id': u.id,
         'filename': u.filename,
@@ -333,7 +421,16 @@ def upload_history():
 
 # ====== ROUTE LẤY CHI TIẾT 1 LẦN UPLOAD ======
 @routes.route('/upload-details/<int:upload_id>', methods=['GET'])
+@jwt_required()
 def upload_details(upload_id):
+    current_user = get_jwt_identity()
+    user_id = current_user['user_id']
+    role = current_user['role']
+
+    upload = Upload.query.get_or_404(upload_id)
+    if role != 'admin' and upload.user_id != user_id:
+        return jsonify({'error': 'Unauthorized access'}), 403
+
     predictions = Prediction.query.filter_by(upload_id=upload_id).all()
     results = [{
         'id': p.id,
@@ -345,13 +442,27 @@ def upload_details(upload_id):
 
 # ====== ROUTE THỐNG KÊ RỦI RO ======
 @routes.route('/risk-stats', methods=['GET'])
+@jwt_required()
 def risk_stats():
-    total_files = Upload.query.count()
-    total_logs = Prediction.query.count()
-    summary = db.session.query(
-        RiskSummary.risk_level,
-        db.func.sum(RiskSummary.count)
-    ).group_by(RiskSummary.risk_level).all()
+    current_user = get_jwt_identity()
+    user_id = current_user['user_id']
+    role = current_user['role']
+
+    if role == 'admin':
+        total_files = Upload.query.count()
+        total_logs = Prediction.query.count()
+        summary = db.session.query(
+            RiskSummary.risk_level,
+            db.func.sum(RiskSummary.count)
+        ).group_by(RiskSummary.risk_level).all()
+    else:
+        total_files = Upload.query.filter_by(user_id=user_id).count()
+        total_logs = Prediction.query.join(Upload).filter(Upload.user_id == user_id).count()
+        summary = db.session.query(
+            RiskSummary.risk_level,
+            db.func.sum(RiskSummary.count)
+        ).join(Upload).filter(Upload.user_id == user_id).group_by(RiskSummary.risk_level).all()
+
     risk_overview = [{'risk_level': r[0], 'count': r[1]} for r in summary]
     return jsonify({
         'total_files': total_files,
@@ -360,9 +471,18 @@ def risk_stats():
     })
 
 # ====== ROUTE LẤY DANH SÁCH UPLOADS ======
-@routes.route('/uploads', methods=['GET'])
+@routes.route('/Uploads', methods=['GET'])
+@jwt_required()
 def get_uploads():
-    uploads = Upload.query.order_by(Upload.upload_time.desc()).all()
+    current_user = get_jwt_identity()
+    user_id = current_user['user_id']
+    role = current_user['role']
+
+    if role == 'admin':
+        uploads = Upload.query.order_by(Upload.upload_time.desc()).all()
+    else:
+        uploads = Upload.query.filter_by(user_id=user_id).order_by(Upload.upload_time.desc()).all()
+
     data = [{
         'upload_id': u.id,
         'filename': u.filename,
@@ -371,3 +491,105 @@ def get_uploads():
         'risk_summary': [{'risk_level': rs.risk_level, 'count': rs.count} for rs in u.risk_summaries]
     } for u in uploads]
     return jsonify(data)
+
+# ====== ROUTE LẤY THÔNG TIN PROFILE ======
+@routes.route('/profile', methods=['GET', 'OPTIONS'])
+@jwt_required()
+def get_profile():
+    print(f"[Profile] Handling {request.method} request for /profile")
+    if request.method == 'OPTIONS':
+        print("[Profile] Returning 200 for OPTIONS /profile")
+        return '', 200
+
+    try:
+        current_user = get_jwt_identity()
+        user = User.query.get_or_404(current_user['user_id'])
+        print(f"[Profile] Fetched profile for user {user.username}")
+        return jsonify({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'created_at': user.created_at.isoformat()
+        }), 200
+    except Exception as e:
+        print(f"[Profile] Error: {e}")
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+# ====== ROUTE CẬP NHẬT PROFILE ======
+@routes.route('/profile', methods=['PUT', 'OPTIONS'])
+@jwt_required()
+def update_profile():
+    print(f"[Profile] Handling {request.method} request for /profile")
+    if request.method == 'OPTIONS':
+        print("[Profile] Returning 200 for OPTIONS /profile")
+        return '', 200
+
+    try:
+        current_user = get_jwt_identity()
+        user = User.query.get_or_404(current_user['user_id'])
+        data = request.get_json()
+        print(f"[Profile] Update data: {data}")
+
+        username = data.get('username')
+        email = data.get('email')
+
+        if not username or not email:
+            print("[Profile] Missing username or email")
+            return jsonify({'error': 'Missing username or email'}), 400
+
+        if username != user.username and User.query.filter_by(username=username).first():
+            print(f"[Profile] Username {username} already exists")
+            return jsonify({'error': 'Username already exists'}), 400
+        if email != user.email and User.query.filter_by(email=email).first():
+            print(f"[Profile] Email {email} already exists")
+            return jsonify({'error': 'Email already exists'}), 400
+
+        user.username = username
+        user.email = email
+        db.session.commit()
+        print(f"[Profile] Updated profile for user {user.username}")
+        return jsonify({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'created_at': user.created_at.isoformat()
+        }), 200
+    except Exception as e:
+        print(f"[Profile] Error: {e}")
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+# ====== ROUTE ĐỔI MẬT KHẨU ======
+@routes.route('/change-password', methods=['POST', 'OPTIONS'])
+@jwt_required()
+def change_password():
+    print(f"[Change-Password] Handling {request.method} request for /change-password")
+    if request.method == 'OPTIONS':
+        print("[Change-Password] Returning 200 for OPTIONS /change-password")
+        return '', 200
+
+    try:
+        current_user = get_jwt_identity()
+        user = User.query.get_or_404(current_user['user_id'])
+        data = request.get_json()
+        print(f"[Change-Password] Request data: {data}")
+
+        current_password = data.get('currentPassword')
+        new_password = data.get('newPassword')
+
+        if not current_password or not new_password:
+            print("[Change-Password] Missing current or new password")
+            return jsonify({'error': 'Missing current or new password'}), 400
+
+        if not bcrypt.checkpw(current_password.encode('utf-8'), user.password_hash.encode('utf-8')):
+            print("[Change-Password] Invalid current password")
+            return jsonify({'error': 'Invalid current password'}), 401
+
+        user.password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        db.session.commit()
+        print(f"[Change-Password] Password changed for user {user.username}")
+        return jsonify({'message': 'Password changed successfully'}), 200
+    except Exception as e:
+        print(f"[Change-Password] Error: {e}")
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
