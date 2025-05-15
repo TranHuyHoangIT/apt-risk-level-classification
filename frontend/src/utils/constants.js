@@ -25,7 +25,6 @@ export const ALL_TABLE_HEADERS = [
     'Thấp': 0,
     'Trung bình': 0,
     'Cao': 0,
-    'Rất cao': 0,
   };
   
   export const CHART_COLORS = ['#ff6384', '#36a2eb', '#ffcd56', '#4bc0c0', '#f06595', '#9966ff'];
