@@ -200,3 +200,71 @@ export const getUploads = async () => {
   }
 };
 
+// Lấy danh sách người dùng
+export const getUsers = async () => {
+    try {
+        console.log('[Users API] Fetching users');
+        const res = await api.get('/users');
+        console.log('[Users API] Fetched users', res.data);
+        return res.data;
+    } catch (error) {
+        console.error('[Users API] Fetch users failed', error);
+        return {
+            error: error.response?.data?.error || 'Đã có lỗi khi lấy danh sách người dùng',
+            status: error.response?.status,
+        };
+    }
+};
+
+// Lấy thông tin một người dùng
+export const getUser = async (userId) => {
+    try {
+        console.log(`[User API] Fetching user ${userId}`);
+        const res = await api.get(`/users/${userId}`);
+        console.log(`[User API] Fetched user ${userId}`, res.data);
+        return res.data;
+    } catch (error) {
+        console.error(`[User API] Fetch user ${userId} failed`, error);
+        return {
+            error: error.response?.data?.error || 'Đã có lỗi khi lấy thông tin người dùng',
+            status: error.response?.status,
+        };
+    }
+};
+
+// Cập nhật thông tin người dùng
+export const updateUser = async (userId, userData) => {
+    try {
+        const { username, email, newPassword } = userData;
+        const payload = { username, email };
+        if (newPassword) {
+            payload.newPassword = newPassword;
+        }
+        console.log(`[User API] Updating user ${userId}`, payload);
+        const res = await api.put(`/users/${userId}`, payload);
+        console.log(`[User API] Updated user ${userId}`, res.data);
+        return res.data;
+    } catch (error) {
+        console.error(`[User API] Update user ${userId} failed`, error);
+        return {
+            error: error.response?.data?.error || 'Đã có lỗi khi cập nhật thông tin người dùng',
+            status: error.response?.status,
+        };
+    }
+};
+
+// Xóa người dùng
+export const deleteUser = async (userId) => {
+    try {
+        console.log(`[User API] Deleting user ${userId}`);
+        const res = await api.delete(`/users/${userId}`);
+        console.log(`[User API] Deleted user ${userId}`, res.data);
+        return res.data;
+    } catch (error) {
+        console.error(`[User API] Delete user ${userId} failed`, error);
+        return {
+            error: error.response?.data?.error || 'Đã có lỗi khi xóa người dùng',
+            status: error.response?.status,
+        };
+    }
+};
