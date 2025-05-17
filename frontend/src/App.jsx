@@ -3,19 +3,30 @@ import { useEffect, useState } from 'react';
 
 import Dashboard from './pages/Dashboard';
 import UploadLogs from './pages/UploadLogs';
-import RiskDetails from './pages/RiskDetails';
-import UploadHistoryPage from './pages/UploadHistoryPage';
+import UploadDetails from './pages/UploadDetails';
+import UploadHistory from './pages/UploadHistory';
 import NotFound from './pages/NotFound';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import UserManagement from './pages/UserManagement';
+import UserEdit from './pages/UserEdit';
 
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, adminOnly = false }) => {
   const isAuthenticated = !!localStorage.getItem('token');
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  const user = localStorage.getItem('user');
+  const isAdmin = user && JSON.parse(user).role === 'admin';
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
 };
 
 export default function App() {
@@ -44,8 +55,10 @@ export default function App() {
                   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="/upload" element={<ProtectedRoute><UploadLogs /></ProtectedRoute>} />
-                  <Route path="/upload-history" element={<ProtectedRoute><UploadHistoryPage /></ProtectedRoute>} />
-                  <Route path="/risk-details/:uploadId" element={<ProtectedRoute><RiskDetails /></ProtectedRoute>} />
+                  <Route path="/upload-history" element={<ProtectedRoute><UploadHistory /></ProtectedRoute>} />
+                  <Route path="/risk-details/:uploadId" element={<ProtectedRoute><UploadDetails /></ProtectedRoute>} />
+                  <Route path="/users" element={<ProtectedRoute adminOnly={true}><UserManagement /></ProtectedRoute>} />
+                  <Route path="/users/:userId" element={<ProtectedRoute adminOnly={true}><UserEdit /></ProtectedRoute>} />
                   <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
@@ -57,4 +70,3 @@ export default function App() {
     </Router>
   );
 }
-

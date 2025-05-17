@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FileText } from 'lucide-react';
 import { getRiskStats, getUploads } from '../services/api';
 import RiskChart from '../components/RiskChart';
 import Loader from '../components/Loader';
@@ -91,7 +92,7 @@ export default function Dashboard() {
           </h2>
           <p className="text-gray-600 mb-6">Tổng quan mức độ rủi ro từ các log đã upload</p>
           {stats && (
-            <div className="bg-white p-6 rounded-xl shadow-xl border border-blue-600/10">
+            <div className="bg-white p-6 rounded-xl shadow-xl border border-blue-600/10 transform transition-all hover:scale-[1.01] duration-300">
               <RiskChart data={stats.risk_overview} className="w-full h-80" />
             </div>
           )}
@@ -103,23 +104,27 @@ export default function Dashboard() {
             Lịch sử upload file
           </h2>
           <p className="text-gray-600 mb-6">Danh sách các file log đã được upload và phân tích</p>
-          <div className="bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden transform transition-all hover:scale-[1.01] duration-300">
             <div className="overflow-x-auto min-w-0">
               <table className="min-w-full table-auto">
-                <thead className="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
+                <thead className="bg-gradient-to-r from-blue-600 to-blue-800 text-white sticky top-0">
                   <tr>
                     <th className="px-6 py-3 text-center w-12">#</th>
-                    <th className="px-6 py-3 text-left min-w-[200px]">Tên file</th>
+                    <th className="px-6 py-3 text-left min-w-[150px]">Tên file</th>
                     <th className="px-6 py-3 text-center min-w-[160px]">Thời gian upload</th>
                     <th className="px-6 py-3 text-center w-32">Tổng số log</th>
-                    <th className="px-6 py-3 text-left min-w-[300px]">Tóm tắt rủi ro</th>
+                    <th className="px-6 py-3 text-left min-w-[500px]">Tóm tắt rủi ro</th>
                   </tr>
                 </thead>
                 <tbody>
                   {uploads.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                        Chưa có file nào được upload
+                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                        <div className="flex flex-col items-center gap-4">
+                          <FileText className="w-16 h-16 text-gray-400" />
+                          <p className="text-gray-600 text-lg font-medium">Chưa có file nào được upload</p>
+                          <p className="text-gray-500">Hãy upload file log để bắt đầu phân tích</p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -132,7 +137,7 @@ export default function Dashboard() {
                         </td>
                         <td className="px-6 py-4 text-center font-medium">{upload.total_logs}</td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-2 md:flex-row flex-col">
+                          <div className="flex flex-wrap gap-2 flex-row">
                             {RISK_ORDER.map((riskLevel, i) => {
                               const item = upload.risk_summary.find(
                                 (rs) => rs.risk_level === riskLevel
