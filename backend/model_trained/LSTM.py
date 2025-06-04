@@ -21,12 +21,20 @@ columns_to_drop = ["Flow ID", "Src IP", "Src Port", "Dst IP", "Dst Port", "Proto
 train_features = train_df.drop(columns=columns_to_drop)
 
 # Convert labels to a more understandable format and then encode them
+# train_labels_raw = train_df["Stage"].map({
+#     'Benign': 'Không có',
+#     'Reconnaissance': 'Rất thấp',
+#     'Establish Foothold': 'Thấp',
+#     'Lateral Movement': 'Trung bình',
+#     'Data Exfiltration': 'Cao'
+# })
+
 train_labels_raw = train_df["Stage"].map({
     'Benign': 'Không có',
-    'Reconnaissance': 'Rất thấp',
-    'Establish Foothold': 'Thấp',
-    'Lateral Movement': 'Trung bình',
-    'Data Exfiltration': 'Cao'
+    'Reconnaissance': 'Thấp',
+    'Establish Foothold': 'Trung bình',
+    'Lateral Movement': 'Cao',
+    'Data Exfiltration': 'Rất cao'
 })
 
 # ======= ENCODING =======
@@ -67,9 +75,9 @@ test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
 test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
 
 # ======= MÔ HÌNH LSTM =======
-class APTLSTM(nn.Module):
+class LSTM(nn.Module):
     def __init__(self, input_dim, hidden_dim=128, output_dim=5, num_layers=2):
-        super(APTLSTM, self).__init__()
+        super(LSTM, self).__init__()
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=0.3)
         self.fc = nn.Linear(hidden_dim, output_dim)
 
@@ -78,7 +86,7 @@ class APTLSTM(nn.Module):
         output = self.fc(lstm_out[:, -1, :])  # Chỉ lấy đầu ra của timestep cuối cùng
         return output
 
-model = APTLSTM(X_train_resampled.shape[1]).to(device)
+model = LSTM(X_train_resampled.shape[1]).to(device)
 
 # ======= FOCAL LOSS =======
 class FocalLoss(nn.Module):
