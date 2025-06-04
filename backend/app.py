@@ -4,6 +4,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from models import db
+# from models.user import User
+# from models.upload import Upload
+# from models.prediction import Prediction
+# from models.risk_summary import RiskSummary
 
 app = Flask(__name__)
 
@@ -26,18 +30,21 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 db.init_app(app)
 jwt = JWTManager(app)
 
-# Kiểm tra import routes
+# Kiểm tra import các blueprint từ thư mục routes
 try:
-    from routes import routes
-    print("[Startup] Imported routes successfully")
+    from routes import auth, upload, user, model_bp
+    print("[Startup] Imported blueprints successfully")
 except ImportError as e:
-    print(f"[Startup Error] Failed to import routes: {e}")
+    print(f"[Startup Error] Failed to import blueprints: {e}")
     raise
 
-# Đăng ký blueprint
-print("[Startup] Registering blueprint 'routes'")
-app.register_blueprint(routes, url_prefix='')
-print("[Startup] Blueprint 'routes' registered")
+# Đăng ký các blueprint
+print("[Startup] Registering blueprints")
+app.register_blueprint(auth, url_prefix='')
+app.register_blueprint(upload, url_prefix='')
+app.register_blueprint(user, url_prefix='')
+app.register_blueprint(model_bp, url_prefix='')
+print("[Startup] Blueprints registered")
 
 if __name__ == '__main__':
     with app.app_context():

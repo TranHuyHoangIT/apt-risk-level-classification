@@ -5,7 +5,7 @@ import { getRiskStats, getUploads } from '../services/api';
 import RiskChart from '../components/RiskChart';
 import Loader from '../components/Loader';
 
-const RISK_ORDER = ['Không có', 'Rất thấp', 'Thấp', 'Trung bình', 'Cao'];
+const RISK_ORDER = ['Không có', 'Thấp', 'Trung bình', 'Cao', 'Rất cao'];
 
 const riskColors = {
   'Không có': 'bg-gray-500',
