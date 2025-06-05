@@ -1,0 +1,8 @@
+# routes/__init__.py
+from .auth import auth
+from .upload import upload
+from .user import user
+from .model import model_bp
+from .realtime import realtime
+
+__all__ = ['auth', 'upload', 'user', 'model_bp', 'realtime']
