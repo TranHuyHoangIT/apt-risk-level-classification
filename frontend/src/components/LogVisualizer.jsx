@@ -10,7 +10,7 @@ import {
   BarElement,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import { ALL_TABLE_HEADERS, RISK_LEVELS, CHART_COLORS } from '../utils/constants';
+import { ALL_TABLE_HEADERS, STAGE_LABELS, CHART_COLORS} from '../utils/constants';
 
 ChartJS.register(
   Title,
@@ -25,24 +25,24 @@ ChartJS.register(
 
 export default function LogVisualizer({ logs }) {
   // Thống kê dữ liệu rủi ro cho chart
-  const getRiskStats = () => {
-    const riskCounts = { ...RISK_LEVELS };
+  const getStageStats = () => {
+    const stageCounts = { ...STAGE_LABELS };
     logs.forEach((log) => {
-      if (log.risk_level in riskCounts) {
-        riskCounts[log.risk_level] += 1;
+      if (log.stage_label in stageCounts) {
+        stageCounts[log.stage_label] += 1;
       }
     });
-    return riskCounts;
+    return stageCounts;
   };
 
-  const riskCounts = getRiskStats();
-  const totalLogs = Object.values(riskCounts).reduce((a, b) => a + b, 0);
+  const stageCounts = getStageStats();
+  const totalLogs = Object.values(stageCounts).reduce((a, b) => a + b, 0);
 
   const pieData = {
-    labels: Object.keys(riskCounts),
+    labels: Object.keys(stageCounts),
     datasets: [
       {
-        data: Object.values(riskCounts),
+        data: Object.values(stageCounts),
         backgroundColor: CHART_COLORS,
         hoverOffset: 4,
       },
@@ -77,11 +77,11 @@ export default function LogVisualizer({ logs }) {
   };
 
   const barData = {
-    labels: Object.keys(riskCounts),
+    labels: Object.keys(stageCounts),
     datasets: [
       {
         label: 'Số lượng log',
-        data: Object.values(riskCounts),
+        data: Object.values(stageCounts),
         backgroundColor: CHART_COLORS,
         borderColor: CHART_COLORS,
         borderWidth: 1,
@@ -94,11 +94,11 @@ export default function LogVisualizer({ logs }) {
       <h3 className="text-xl font-semibold text-center text-gray-700">📊 Kết quả phân loại</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
         <div className="p-4 bg-white rounded-xl shadow-md">
-          <h4 className="text-lg font-semibold mb-2 text-gray-700">Tỷ lệ mức độ rủi ro</h4>
+          <h4 className="text-lg font-semibold mb-2 text-gray-700">Tỷ lệ giai đoạn tấn công</h4>
           <Pie data={pieData} options={pieOptions} />
         </div>
         <div className="p-4 bg-white rounded-xl shadow-md">
-          <h4 className="text-lg font-semibold mb-2 text-gray-700">Số lượng các mức độ rủi ro</h4>
+          <h4 className="text-lg font-semibold mb-2 text-gray-700">Số lượng các giai đoạn tấn công</h4>
           <Bar data={barData} options={{ aspectRatio: 1.5 }} />
         </div>
       </div>

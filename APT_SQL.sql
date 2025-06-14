@@ -31,15 +31,15 @@ CREATE TABLE predictions (
     FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE
 );
 
--- Bảng risk_summary
-CREATE TABLE risk_summary (
+-- Bảng stage_summary
+CREATE TABLE stage_summary (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     upload_id BIGINT,
-    risk_level VARCHAR(100),
+    stage_label VARCHAR(100),
     count INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE,
-    UNIQUE (upload_id, risk_level)
+    UNIQUE (upload_id, stage_label)
 );
 
 INSERT INTO users (username, email, password_hash, role, created_at, updated_at)
@@ -52,4 +52,5 @@ VALUES (
     NOW()
 );
 
-SELECT * FROM users
+SELECT * FROM users;
+

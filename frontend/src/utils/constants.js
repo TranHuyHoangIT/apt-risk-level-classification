@@ -16,15 +16,17 @@ export const ALL_TABLE_HEADERS = [
     'Subflow Bwd Packets', 'Subflow Bwd Bytes', 'FWD Init Win Bytes', 'Bwd Init Win Bytes',
     'Fwd Act Data Pkts', 'Fwd Seg Size Min', 'Active Mean', 'Active Std', 'Active Max', 'Active Min',
     'Idle Mean', 'Idle Std', 'Idle Max', 'Idle Min',
-    'risk_level'
+    'stage_label'
   ];
-  
-  export const RISK_LEVELS = {
-    'Không có': 0,
-    'Thấp': 0,
-    'Trung bình': 0,
-    'Cao': 0,
-    'Rất cao': 0,
+
+    export const STAGE_LABELS = {
+    'Benign': 0,
+    'Reconnaissance': 0,
+    'Establish Foothold': 0,
+    'Lateral Movement': 0,
+    'Data Exfiltration': 0,
   };
   
-  export const CHART_COLORS = ['#ff6384', '#36a2eb', '#ffcd56', '#4bc0c0', '#f06595', '#9966ff'];
+  // export const CHART_COLORS = ['#ff6384', '#36a2eb', '#ffcd56', '#4bc0c0', '#f06595', '#9966ff'];
+
+    export const CHART_COLORS = ['#6b7280', '#84cc16', '#facc15', '#f97316', '#dc2626'];

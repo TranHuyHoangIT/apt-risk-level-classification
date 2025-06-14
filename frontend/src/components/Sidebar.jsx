@@ -15,7 +15,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
       <div className="p-4 sm:p-6 flex items-center gap-2">
         <ShieldCheck className="w-8 h-8 text-blue-400" />
         <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-          APT Risk
+          APT Stage
         </span>
       </div>
 

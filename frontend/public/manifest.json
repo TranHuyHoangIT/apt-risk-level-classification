@@ -1,6 +1,6 @@
 {
-  "short_name": "APT Risk Level Classification",
-  "name": "APT Risk Level Classification",
+  "short_name": "APT Stage Level Classification",
+  "name": "APT Stage Level Classification",
   "icons": [
     {
       "src": "favicon.ico",

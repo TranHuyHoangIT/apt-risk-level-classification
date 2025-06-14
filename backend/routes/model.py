@@ -178,10 +178,10 @@ def predict():
     with torch.no_grad():
         outputs = model(X_tensor)
         pred_idx = torch.argmax(outputs, dim=1).cpu().item()
-        risk_label = label_encoder.inverse_transform([pred_idx])[0]
+        stage_label = label_encoder.inverse_transform([pred_idx])[0]
 
-    pred = Prediction(upload_id=None, log_data=data['log'], predicted_label=risk_label)
+    pred = Prediction(upload_id=None, log_data=data['log'], predicted_label=stage_label)
     db.session.add(pred)
     db.session.commit()
 
-    return jsonify({'risk_level': risk_label})
+    return jsonify({'stage_label': stage_label})

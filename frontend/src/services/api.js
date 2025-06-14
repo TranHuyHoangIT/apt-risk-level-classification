@@ -175,9 +175,9 @@ export const getUploadDetails = async (uploadId) => {
 };
 
 // Lấy thống kê rủi ro
-export const getRiskStats = async () => {
+export const getStageStats = async () => {
   try {
-    const res = await api.get('/risk-stats');
+    const res = await api.get('/stage-stats');
     return res.data;
   } catch (error) {
     return {
