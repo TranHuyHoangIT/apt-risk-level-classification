@@ -5,6 +5,6 @@ db = SQLAlchemy()
 from .user import User
 from .upload import Upload
 from .prediction import Prediction
-from .risk_summary import RiskSummary
+from .stage_summary import StageSummary
 
-__all__ = ['db', 'User', 'Upload', 'Prediction', 'RiskSummary']
+__all__ = ['db', 'User', 'Upload', 'Prediction', 'StageSummary']

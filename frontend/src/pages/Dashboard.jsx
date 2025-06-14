@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText } from 'lucide-react';
-import { getRiskStats, getUploads } from '../services/api';
-import RiskChart from '../components/RiskChart';
+import { getStageStats, getUploads } from '../services/api';
+import StageChart from '../components/StageChart';
 import Loader from '../components/Loader';
 
-const RISK_ORDER = ['Không có', 'Thấp', 'Trung bình', 'Cao', 'Rất cao'];
+const STAGE_ORDER = ['Benign', 'Reconnaissance', 'Establish Foothold', 'Lateral Movement', 'Data Exfiltration'];
 
-const riskColors = {
-  'Không có': 'bg-gray-500',
-  'Rất thấp': 'bg-green-500',
-  'Thấp': 'bg-green-600',
-  'Trung bình': 'bg-yellow-500',
-  'Cao': 'bg-red-600',
+const stageColors = {
+  'Benign': 'bg-gray-500',
+  'Reconnaissance': 'bg-lime-500',
+  'Establish Foothold': 'bg-yellow-400',
+  'Lateral Movement': 'bg-orange-500',
+  'Data Exfiltration': 'bg-red-600',
 };
 
 export default function Dashboard() {
@@ -39,19 +39,19 @@ export default function Dashboard() {
     async function fetchData() {
       try {
         const [statsData, uploadsData] = await Promise.all([
-          getRiskStats(),
+          getStageStats(),
           getUploads(),
         ]);
 
-        const processedRiskOverview = RISK_ORDER.map((riskLevel) => {
-          const item = statsData.risk_overview.find((i) => i.risk_level === riskLevel);
+        const processedStageOverview = STAGE_ORDER.map((stageLabel) => {
+          const item = statsData.stage_overview.find((i) => i.stage_label === stageLabel);
           return {
-            risk_level: riskLevel,
+            stage_label: stageLabel,
             count: item ? Number(item.count) : 0,
           };
         });
 
-        setStats({ ...statsData, risk_overview: processedRiskOverview });
+        setStats({ ...statsData, stage_overview: processedStageOverview });
         setUploads(uploadsData);
         setError('');
       } catch (err) {
@@ -85,15 +85,15 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Phân bố mức độ rủi ro */}
+        {/* Phân bố giai đoạn tấn công */}
         <div className="mb-12">
           <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent mb-2">
-            Phân bố mức độ rủi ro
+            Phân bố giai đoạn tấn công APT
           </h2>
-          <p className="text-gray-600 mb-6">Tổng quan mức độ rủi ro từ các log đã upload</p>
+          <p className="text-gray-600 mb-6">Tổng quan giai đoạn tấn công từ các log đã upload</p>
           {stats && (
             <div className="bg-white p-6 rounded-xl shadow-xl border border-blue-600/10 transform transition-all hover:scale-[1.01] duration-300">
-              <RiskChart data={stats.risk_overview} className="w-full h-80" />
+              <StageChart data={stats.stage_overview} className="w-full h-80" />
             </div>
           )}
         </div>
@@ -113,7 +113,7 @@ export default function Dashboard() {
                     <th className="px-6 py-3 text-left min-w-[150px]">Tên file</th>
                     <th className="px-6 py-3 text-center min-w-[160px]">Thời gian upload</th>
                     <th className="px-6 py-3 text-center w-32">Tổng số log</th>
-                    <th className="px-6 py-3 text-left min-w-[500px]">Tóm tắt rủi ro</th>
+                    <th className="px-6 py-3 text-left min-w-[500px]">Tóm tắt giai đoạn tấn công</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -138,17 +138,17 @@ export default function Dashboard() {
                         <td className="px-6 py-4 text-center font-medium">{upload.total_logs}</td>
                         <td className="px-6 py-4">
                           <div className="flex flex-wrap gap-2 flex-row">
-                            {RISK_ORDER.map((riskLevel, i) => {
-                              const item = upload.risk_summary.find(
-                                (rs) => rs.risk_level === riskLevel
+                            {STAGE_ORDER.map((stageLabel, i) => {
+                              const item = upload.stage_summary.find(
+                                (rs) => rs.stage_label === stageLabel
                               );
                               const count = item ? item.count : 0;
                               return (
                                 <span
                                   key={i}
-                                  className={`px-2 py-1 rounded text-xs text-white font-medium ${riskColors[riskLevel]}`}
+                                  className={`px-2 py-1 rounded text-xs text-white font-medium ${stageColors[stageLabel]}`}
                                 >
-                                  {riskLevel}: {count}
+                                  {stageLabel}: {count}
                                 </span>
                               );
                             })}

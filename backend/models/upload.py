@@ -8,7 +8,7 @@ class Upload(db.Model):
     user_id = db.Column(db.BigInteger, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     upload_time = db.Column(db.DateTime, server_default=db.func.now())
     predictions = db.relationship('Prediction', backref='upload', cascade="all, delete", lazy='dynamic')
-    risk_summaries = db.relationship('RiskSummary', backref='upload', cascade="all, delete", lazy='dynamic')
+    stage_summaries = db.relationship('StageSummary', backref='upload', cascade="all, delete", lazy='dynamic')
 
     def __repr__(self):
         return f'<Upload {self.filename}>'

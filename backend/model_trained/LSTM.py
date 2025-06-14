@@ -20,22 +20,8 @@ train_df = pd.read_csv("../data/DSRL-APT-2023.csv")
 columns_to_drop = ["Flow ID", "Src IP", "Src Port", "Dst IP", "Dst Port", "Protocol", "Timestamp", "Activity"]
 train_features = train_df.drop(columns=columns_to_drop)
 
-# Convert labels to a more understandable format and then encode them
-# train_labels_raw = train_df["Stage"].map({
-#     'Benign': 'Không có',
-#     'Reconnaissance': 'Rất thấp',
-#     'Establish Foothold': 'Thấp',
-#     'Lateral Movement': 'Trung bình',
-#     'Data Exfiltration': 'Cao'
-# })
-
-train_labels_raw = train_df["Stage"].map({
-    'Benign': 'Không có',
-    'Reconnaissance': 'Thấp',
-    'Establish Foothold': 'Trung bình',
-    'Lateral Movement': 'Cao',
-    'Data Exfiltration': 'Rất cao'
-})
+# Loại bỏ ánh xạ mức độ rủi ro, giữ nguyên nhãn giai đoạn tấn công
+train_labels_raw = train_df["Stage"]
 
 # ======= ENCODING =======
 label_encoder = LabelEncoder()
@@ -44,10 +30,10 @@ train_labels = label_encoder.fit_transform(train_labels_raw)
 # ======= SCALING =======
 scaler = StandardScaler()
 
-# Ensure only numeric data is passed into SMOTE
+# Đảm bảo chỉ xử lý dữ liệu số để chuẩn hóa
 train_features_numeric = train_features.select_dtypes(include=[np.number])
 
-# Apply scaling to numeric features only
+# Áp dụng chuẩn hóa cho các đặc trưng số
 X_train_scaled = scaler.fit_transform(train_features_numeric)
 
 # ======= CHIA DỮ LIỆU =======

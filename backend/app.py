@@ -7,7 +7,7 @@ from models import db
 # from models.user import User
 # from models.upload import Upload
 # from models.prediction import Prediction
-# from models.risk_summary import RiskSummary
+# from models.stage_summary import StageSummary
 
 app = Flask(__name__)
 

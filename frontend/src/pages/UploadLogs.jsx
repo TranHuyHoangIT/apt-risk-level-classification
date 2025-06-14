@@ -29,7 +29,7 @@ export default function UploadLogs() {
             ALL_TABLE_HEADERS.forEach((header) => {
               row[header] = logData[header] || '';
             });
-            row.risk_level = res.risk_level;
+            row.stage_label = res.stage_label;
             return row;
           });
 
@@ -55,7 +55,7 @@ export default function UploadLogs() {
                 ALL_TABLE_HEADERS.forEach((header, index) => {
                   row[header] = logRow[index] || '';
                 });
-                row.risk_level = res.risk_level;
+                row.stage_label = res.stage_label;
                 return row;
               });
 

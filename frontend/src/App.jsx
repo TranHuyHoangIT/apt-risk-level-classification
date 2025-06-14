@@ -56,7 +56,7 @@ export default function App() {
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="/upload" element={<ProtectedRoute><UploadLogs /></ProtectedRoute>} />
                   <Route path="/upload-history" element={<ProtectedRoute><UploadHistory /></ProtectedRoute>} />
-                  <Route path="/risk-details/:uploadId" element={<ProtectedRoute><UploadDetails /></ProtectedRoute>} />
+                  <Route path="/stage-details/:uploadId" element={<ProtectedRoute><UploadDetails /></ProtectedRoute>} />
                   <Route path="/users" element={<ProtectedRoute adminOnly={true}><UserManagement /></ProtectedRoute>} />
                   <Route path="/users/:userId" element={<ProtectedRoute adminOnly={true}><UserEdit /></ProtectedRoute>} />
                   <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />

@@ -47,7 +47,7 @@ export default function UploadDetails() {
           ALL_TABLE_HEADERS.forEach((header, index) => {
             row[header] = values[index] || '';
           });
-          row.risk_level = item.predicted_label;
+          row.stage_label = item.predicted_label;
           return row;
         });
         setLogs(parsedData);
@@ -69,7 +69,7 @@ export default function UploadDetails() {
             <FileText className="w-8 h-8" />
             Chi tiết bản ghi
           </h1>
-          <p className="text-gray-600 mt-2">Xem chi tiết các log và mức độ rủi ro của file upload</p>
+          <p className="text-gray-600 mt-2">Xem chi tiết các log và giai đoạn tấn công của file upload</p>
         </div>
 
         {/* Thông báo lỗi */}

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Upload, Prediction, RiskSummary
+from models import db, Upload, Prediction, StageSummary
 import os
 import subprocess
 import uuid
@@ -49,21 +49,21 @@ def upload_logs():
     with torch.no_grad():
         outputs = model(X_tensor)
         preds = torch.argmax(outputs, dim=1).cpu().numpy()
-        risk_labels = label_encoder.inverse_transform(preds)
+        stage_labels = label_encoder.inverse_transform(preds)
 
-    risk_count = {}
-    for log_data, risk_label in zip(raw_logs, risk_labels):
-        pred = Prediction(upload_id=upload_entry.id, log_data=log_data, predicted_label=risk_label)
+    stage_count = {}
+    for log_data, stage_label in zip(raw_logs, stage_labels):
+        pred = Prediction(upload_id=upload_entry.id, log_data=log_data, predicted_label=stage_label)
         db.session.add(pred)
-        risk_count[risk_label] = risk_count.get(risk_label, 0) + 1
+        stage_count[stage_label] = stage_count.get(stage_label, 0) + 1
 
-    for risk_level, count in risk_count.items():
-        summary = RiskSummary(upload_id=upload_entry.id, risk_level=risk_level, count=count)
+    for stage_label, count in stage_count.items():
+        summary = StageSummary(upload_id=upload_entry.id, stage_label=stage_label, count=count)
         db.session.add(summary)
 
     db.session.commit()
 
-    results = [{'log_index': i, 'risk_level': label} for i, label in enumerate(risk_labels)]
+    results = [{'log_index': i, 'stage_label': label} for i, label in enumerate(stage_labels)]
     return jsonify({'upload_id': upload_entry.id, 'results': results})
 
 @upload.route('/upload-pcap', methods=['POST'])
@@ -125,16 +125,16 @@ def upload_pcap():
     with torch.no_grad():
         outputs = model(X_tensor)
         preds = torch.argmax(outputs, dim=1).cpu().numpy()
-        risk_labels = label_encoder.inverse_transform(preds)
+        stage_labels = label_encoder.inverse_transform(preds)
 
-    risk_count = {}
-    for log_data, risk_label in zip(raw_logs, risk_labels):
-        pred = Prediction(upload_id=upload_entry.id, log_data=log_data, predicted_label=risk_label)
+    stage_count = {}
+    for log_data, stage_label in zip(raw_logs, stage_labels):
+        pred = Prediction(upload_id=upload_entry.id, log_data=log_data, predicted_label=stage_label)
         db.session.add(pred)
-        risk_count[risk_label] = risk_count.get(risk_label, 0) + 1
+        stage_count[stage_label] = stage_count.get(stage_label, 0) + 1
 
-    for risk_level, count in risk_count.items():
-        summary = RiskSummary(upload_id=upload_entry.id, risk_level=risk_level, count=count)
+    for stage_label, count in stage_count.items():
+        summary = StageSummary(upload_id=upload_entry.id, stage_label=stage_label, count=count)
         db.session.add(summary)
 
     db.session.commit()
@@ -143,7 +143,7 @@ def upload_pcap():
         if os.path.exists(path):
             os.remove(path)
 
-    results = [{'log_index': i, 'risk_level': label} for i, label in enumerate(risk_labels)]
+    results = [{'log_index': i, 'stage_label': label} for i, label in enumerate(stage_labels)]
     return jsonify({'upload_id': upload_entry.id, 'results': results})
 
 @upload.route('/upload-history', methods=['GET'])
@@ -187,9 +187,9 @@ def upload_details(upload_id):
     } for p in predictions]
     return jsonify(results)
 
-@upload.route('/risk-stats', methods=['GET'])
+@upload.route('/stage-stats', methods=['GET'])
 @jwt_required()
-def risk_stats():
+def stage_stats():
     current_user = get_jwt_identity()
     user_id = current_user['user_id']
     role = current_user['role']
@@ -198,22 +198,22 @@ def risk_stats():
         total_files = Upload.query.count()
         total_logs = Prediction.query.count()
         summary = db.session.query(
-            RiskSummary.risk_level,
-            db.func.sum(RiskSummary.count)
-        ).group_by(RiskSummary.risk_level).all()
+            StageSummary.stage_label,
+            db.func.sum(StageSummary.count)
+        ).group_by(StageSummary.stage_label).all()
     else:
         total_files = Upload.query.filter_by(user_id=user_id).count()
         total_logs = Prediction.query.join(Upload).filter(Upload.user_id == user_id).count()
         summary = db.session.query(
-            RiskSummary.risk_level,
-            db.func.sum(RiskSummary.count)
-        ).join(Upload).filter(Upload.user_id == user_id).group_by(RiskSummary.risk_level).all()
+            StageSummary.stage_label,
+            db.func.sum(StageSummary.count)
+        ).join(Upload).filter(Upload.user_id == user_id).group_by(StageSummary.stage_label).all()
 
-    risk_overview = [{'risk_level': r[0], 'count': r[1]} for r in summary]
+    stage_overview = [{'stage_label': r[0], 'count': r[1]} for r in summary]
     return jsonify({
         'total_files': total_files,
         'total_logs': total_logs,
-        'risk_overview': risk_overview
+        'stage_overview': stage_overview
     })
 
 @upload.route('/Uploads', methods=['GET'])
@@ -233,6 +233,6 @@ def get_uploads():
         'filename': u.filename,
         'upload_time': u.upload_time.strftime('%Y-%m-%d %H:%M'),
         'total_logs': Prediction.query.filter_by(upload_id=u.id).count(),
-        'risk_summary': [{'risk_level': rs.risk_level, 'count': rs.count} for rs in u.risk_summaries]
+        'stage_summary': [{'stage_label': rs.stage_label, 'count': rs.count} for rs in u.stage_summaries]
     } for u in uploads]
     return jsonify(data)

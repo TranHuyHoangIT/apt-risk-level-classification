@@ -1,4 +1,4 @@
-# APT Risk Level Classification
+# APT Stage Level Classification
 ## Hướng dẫn sử dụng
 ### 0. Prerequisites
 Đảm các công cụ sau đã được cài đặt:
@@ -7,7 +7,7 @@
 - pip (tương thích với phiên bản Python)
 ### 1. Clone repository
 ```bash
-https://github.com/TranHuyHoangIT/apt-risk-level-classification.git
+https://github.com/TranHuyHoangIT/apt-stage-level-classification.git
 ```
 ### 2. Cài đặt dependencies
 **Backend**
@@ -40,7 +40,7 @@ npm start
 
 ## 5. Cấu trúc thư mục của hệ thống 📂 
 ```plaintext
-apt-risk-level-classification/
+apt-stage-level-classification/
 ├── frontend/                # Giao diện người dùng (phần giao diện phía client)
 │   ├── node_modules/        # Thư mục chứa các gói phụ thuộc của Node.js
 │   ├── public/              # Thư mục chứa các tệp tĩnh (static files)

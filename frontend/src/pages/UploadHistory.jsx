@@ -43,7 +43,7 @@ export default function UploadHistory() {
 
   // Xử lý chọn upload
   const handleSelectUpload = (uploadId) => {
-    navigate(`/risk-details/${uploadId}`);
+    navigate(`/stage-details/${uploadId}`);
   };
 
   return (
@@ -55,7 +55,7 @@ export default function UploadHistory() {
             <History className="w-8 h-8" />
             Lịch sử Upload
           </h1>
-          <p className="text-gray-600 mt-2">Xem lại các file log đã upload và chi tiết rủi ro</p>
+          <p className="text-gray-600 mt-2">Xem lại các file log đã upload và chi tiết giai đoạn tấn công</p>
         </div>
 
         {/* Thông báo lỗi */}
@@ -79,7 +79,7 @@ export default function UploadHistory() {
               <div className="flex flex-col items-center gap-4 py-8">
                 <History className="w-16 h-16 text-gray-400" />
                 <p className="text-gray-600 text-lg font-medium">Chưa có upload nào</p>
-                <p className="text-gray-500">Hãy upload file log để bắt đầu phân tích rủi ro.</p>
+                <p className="text-gray-500">Hãy upload file log để bắt đầu phân tích giai đoạn tấn công.</p>
               </div>
             ) : (
               <>
