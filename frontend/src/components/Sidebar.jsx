@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { ShieldCheck, Upload, List, Users } from 'lucide-react';
+import { ShieldCheck, Upload, List, Users, PlayCircle } from 'lucide-react'; // Thêm PlayCircle
 
 export default function Sidebar({ isOpen, toggleSidebar }) {
   const user = localStorage.getItem('user');
@@ -57,6 +57,21 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
           <List className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
           Upload Archive
         </NavLink>
+
+        {/* Simulation */}
+        <NavLink
+          to="/simulation"
+          onClick={() => window.innerWidth < 768 && toggleSidebar()}
+          className={({ isActive }) =>
+            `flex items-center gap-3 p-3 rounded-lg text-gray-200 hover:bg-blue-700 hover:text-white transition-all duration-200 group ${
+              isActive ? 'bg-blue-700 text-white' : ''
+            }`
+          }
+        >
+          <PlayCircle className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+          Simulation
+        </NavLink>
+
         {isAdmin && (
           <NavLink
             to="/users"

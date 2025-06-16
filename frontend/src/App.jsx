@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import UploadLogs from './pages/UploadLogs';
 import UploadDetails from './pages/UploadDetails';
 import UploadHistory from './pages/UploadHistory';
+import Simulation from './pages/Simulation';
 import NotFound from './pages/NotFound';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -57,6 +58,7 @@ export default function App() {
                   <Route path="/upload" element={<ProtectedRoute><UploadLogs /></ProtectedRoute>} />
                   <Route path="/upload-history" element={<ProtectedRoute><UploadHistory /></ProtectedRoute>} />
                   <Route path="/stage-details/:uploadId" element={<ProtectedRoute><UploadDetails /></ProtectedRoute>} />
+                  <Route path="/simulation" element={<ProtectedRoute><Simulation /></ProtectedRoute>} />
                   <Route path="/users" element={<ProtectedRoute adminOnly={true}><UserManagement /></ProtectedRoute>} />
                   <Route path="/users/:userId" element={<ProtectedRoute adminOnly={true}><UserEdit /></ProtectedRoute>} />
                   <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
