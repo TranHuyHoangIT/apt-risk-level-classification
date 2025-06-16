@@ -268,3 +268,58 @@ export const deleteUser = async (userId) => {
         };
     }
 };
+
+export const simulate = (file, onData, onError) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  console.log('[Simulate API] Sending simulate request', { filename: file.name });
+  const response = fetch(`${BASE_URL}/simulate`, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+    },
+  });
+
+  const eventSourcePromise = response.then(res => {
+    if (!res.ok) throw new Error('Network response was not ok');
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    function process() {
+      reader.read().then(({ done, value }) => {
+        if (done) {
+          onError?.('Stream ended');
+          return;
+        }
+        buffer += decoder.decode(value);
+        let lines = buffer.split('\n\n');
+        buffer = lines.pop(); // Giữ phần chưa hoàn thành
+
+        for (const line of lines) {
+          if (line.startsWith('data:')) {
+            const data = JSON.parse(line.replace('data: ', ''));
+            if (data.error) {
+              onError?.(data.error);
+            } else {
+              onData(data);
+            }
+          }
+        }
+        process();
+      }).catch(err => onError?.(err));
+    }
+    process();
+
+    return {
+      close: () => reader.cancel(), // Phương thức đóng stream
+    };
+  }).catch(err => {
+    onError?.(err);
+    return { close: () => {} }; // Trả về object giả nếu lỗi
+  });
+
+  return eventSourcePromise;
+};

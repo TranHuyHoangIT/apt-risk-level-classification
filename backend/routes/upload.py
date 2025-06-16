@@ -1,4 +1,7 @@
-from flask import Blueprint, request, jsonify
+import json
+import time
+
+from flask import Blueprint, request, jsonify, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Upload, Prediction, StageSummary
 import os
@@ -236,3 +239,85 @@ def get_uploads():
         'stage_summary': [{'stage_label': rs.stage_label, 'count': rs.count} for rs in u.stage_summaries]
     } for u in uploads]
     return jsonify(data)
+
+@upload.route('/simulate', methods=['POST'])
+@jwt_required()
+def simulate():
+    current_user = get_jwt_identity()
+    if 'file' not in request.files:
+        return jsonify({'error': 'Missing file'}), 400
+
+    file = request.files['file']
+    filename = file.filename
+    if not (filename.lower().endswith('.csv') or filename.lower().endswith('.pcap')):
+        return jsonify({'error': 'Invalid file format. Upload CSV or PCAP'}), 400
+
+    save_path = os.path.join('Uploads', filename)
+    os.makedirs('Uploads', exist_ok=True)
+    file.save(save_path)
+
+    def generate():
+        try:
+            if filename.lower().endswith('.pcap'):
+                csv_filename = f"{uuid.uuid4()}.csv"
+                csv_save_path = os.path.join('Uploads', csv_filename)
+                cicflowmeter_dir = os.path.join(os.path.dirname(__file__), 'cicflowmeter')
+                venv_activate = os.path.join(cicflowmeter_dir, '.venv', 'bin', 'activate') if platform.system() != 'Windows' else os.path.join(cicflowmeter_dir, '.venv', 'Scripts', 'activate.bat')
+
+                if platform.system() == 'Windows':
+                    cmd = f'"{venv_activate}" && cicflowmeter -f "{save_path}" -c "{csv_save_path}"'
+                else:
+                    cmd = f'. "{venv_activate}" && cicflowmeter -f "{save_path}" -c "{csv_save_path}"'
+
+                try:
+                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+                    if result.returncode != 0:
+                        yield f"data: {json.dumps({'error': 'CICFlowMeter failed'})}\n\n"
+                        return
+                except subprocess.TimeoutExpired:
+                    yield f"data: {json.dumps({'error': 'CICFlowMeter timed out'})}\n\n"
+                    return
+
+                df = pd.read_csv(csv_save_path)
+                df['Flow ID'] = 0
+                df = df.rename(columns=column_mapping)
+                new_df = pd.DataFrame({col: df.get(col, 0) for col in desired_columns})
+                feature_list = [parse_csv_row(row) for _, row in new_df.iterrows()]
+                raw_logs = [row.to_json() for _, row in new_df.iterrows()]
+                for path in [save_path, csv_save_path]:
+                    if os.path.exists(path):
+                        os.remove(path)
+            else:
+                lines = open(save_path, encoding='utf-8').read().strip().split('\n')
+                feature_list = []
+                raw_logs = []
+                for line in lines:
+                    if line.strip():
+                        features = parse_log(line)
+                        feature_list.append(features)
+                        raw_logs.append(line)
+
+            if not feature_list:
+                yield f"data: {json.dumps({'error': 'Invalid file data'})}\n\n"
+                return
+
+            for i, (features, log_data) in enumerate(zip(feature_list, raw_logs)):
+                X = np.array(features).reshape(1, -1)
+                X_scaled = scaler.transform(X)
+                X_tensor = torch.tensor(X_scaled, dtype=torch.float32).unsqueeze(1).to(device)
+
+                with torch.no_grad():
+                    outputs = model(X_tensor)
+                    pred_idx = torch.argmax(outputs, dim=1).cpu().item()
+                    stage_label = label_encoder.inverse_transform([pred_idx])[0]
+
+                yield f"data: {json.dumps({'log_index': i, 'stage_label': stage_label})}\n\n"
+                time.sleep(0.5)  # 0.5s delay for real-time simulation
+
+            if os.path.exists(save_path):
+                os.remove(save_path)
+
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
