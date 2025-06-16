@@ -251,17 +251,24 @@ const Simulation = () => {
         {/* Main Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden transform transition-all hover:scale-[1.01] duration-300">
           <div className="p-4 sm:p-6">
-            <div className="flex items-center space-x-4 mb-6">
-              <input
-                type="file"
-                accept=".csv,.pcap"
-                onChange={handleFileChange}
-                className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+              <div className="flex-1 min-w-0">
+                <input
+                  type="file"
+                  accept=".csv,.pcap"
+                  onChange={handleFileChange}
+                  className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 file:cursor-pointer cursor-pointer"
+                />
+                {file && (
+                  <p className="text-sm text-gray-500 mt-2">
+                   
+                  </p>
+                )}
+              </div>
               <button
                 onClick={processFile}
                 disabled={isProcessing}
-                className={`px-6 py-2 rounded-md text-white font-semibold transition-colors duration-200 ${
+                className={`px-6 py-2 rounded-md text-white font-semibold transition-colors duration-200 whitespace-nowrap ${
                   isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
                 }`}
               >
@@ -294,7 +301,7 @@ const Simulation = () => {
                   {predictions.map((pred, idx) => (
                     <li
                       key={idx}
-                      className="flex items-center space-x-2 p-2 bg-white rounded-md border{(index % 2 === 0 ? 'bg-gray-50' : 'bg-white')} border-gray-200"
+                      className="flex items-center space-x-2 p-2 bg-white rounded-md border border-gray-200"
                     >
                       <span
                         className="w-3 h-3 rounded-full"
