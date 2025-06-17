@@ -1,16 +1,16 @@
-import json
-import time
-
-from flask import Blueprint, request, jsonify, Response
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Upload, Prediction, StageSummary
 import os
-import subprocess
 import uuid
+import subprocess
 import platform
 import pandas as pd
 import numpy as np
 import torch
+import json
+import time
+from models import db, Upload, Prediction, StageSummary
+from flask import Blueprint, request, jsonify, Response
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from collections import deque
 from .model import model, scaler, label_encoder, parse_log, parse_csv_row, desired_columns, column_mapping, device
 
 upload = Blueprint('upload', __name__)
@@ -240,84 +240,211 @@ def get_uploads():
     } for u in uploads]
     return jsonify(data)
 
+
+user_file_queues = {}
+user_processing_status = {}
+
 @upload.route('/simulate', methods=['POST'])
 @jwt_required()
 def simulate():
     current_user = get_jwt_identity()
+    print(f"[Backend] Current user: {current_user}")
+
+    # Extract a hashable user identifier
+    if isinstance(current_user, dict):
+        user_id = current_user.get('user_id')
+        if not user_id:
+            print("[Backend] Error: No valid user identifier in JWT payload")
+            return jsonify({'error': 'Invalid user identifier in JWT payload'}), 400
+    else:
+        user_id = current_user
+
+    print(f"[Backend] Using user_id: {user_id}")
+
     if 'file' not in request.files:
-        return jsonify({'error': 'Missing file'}), 400
+        print("[Backend] Error: No file part in request")
+        return jsonify({'error': 'No file part in request'}), 400
 
     file = request.files['file']
+    if not file or file.filename == '':
+        print("[Backend] Error: No selected file or empty filename")
+        return jsonify({'error': 'No selected file or empty filename'}), 400
+
     filename = file.filename
+    print(f"[Backend] Received file: {filename}")
     if not (filename.lower().endswith('.csv') or filename.lower().endswith('.pcap')):
+        print(f"[Backend] Error: Invalid file format for {filename}")
         return jsonify({'error': 'Invalid file format. Upload CSV or PCAP'}), 400
 
-    save_path = os.path.join('Uploads', filename)
+    # Initialize user queue if not exists
+    if user_id not in user_file_queues:
+        user_file_queues[user_id] = deque()
+        user_processing_status[user_id] = False
+
+    # Save the uploaded file
+    save_path = os.path.join('Uploads', f"{uuid.uuid4()}_{filename}")
     os.makedirs('Uploads', exist_ok=True)
     file.save(save_path)
+    user_file_queues[user_id].append({'path': save_path, 'original_name': filename})
+    print(f"[Backend] Saved file to: {save_path}")
 
+    # Send immediate response that file was queued
     def generate():
         try:
-            if filename.lower().endswith('.pcap'):
-                csv_filename = f"{uuid.uuid4()}.csv"
-                csv_save_path = os.path.join('Uploads', csv_filename)
-                cicflowmeter_dir = os.path.join(os.path.dirname(__file__), 'cicflowmeter')
-                venv_activate = os.path.join(cicflowmeter_dir, '.venv', 'bin', 'activate') if platform.system() != 'Windows' else os.path.join(cicflowmeter_dir, '.venv', 'Scripts', 'activate.bat')
+            # Send file queued confirmation
+            yield f"data: {json.dumps({'status': 'file_queued', 'filename': filename, 'queue_length': len(user_file_queues[user_id])})}\n\n"
 
-                if platform.system() == 'Windows':
-                    cmd = f'"{venv_activate}" && cicflowmeter -f "{save_path}" -c "{csv_save_path}"'
-                else:
-                    cmd = f'. "{venv_activate}" && cicflowmeter -f "{save_path}" -c "{csv_save_path}"'
-
-                try:
-                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
-                    if result.returncode != 0:
-                        yield f"data: {json.dumps({'error': 'CICFlowMeter failed'})}\n\n"
-                        return
-                except subprocess.TimeoutExpired:
-                    yield f"data: {json.dumps({'error': 'CICFlowMeter timed out'})}\n\n"
-                    return
-
-                df = pd.read_csv(csv_save_path)
-                df['Flow ID'] = 0
-                df = df.rename(columns=column_mapping)
-                new_df = pd.DataFrame({col: df.get(col, 0) for col in desired_columns})
-                feature_list = [parse_csv_row(row) for _, row in new_df.iterrows()]
-                raw_logs = [row.to_json() for _, row in new_df.iterrows()]
-                for path in [save_path, csv_save_path]:
-                    if os.path.exists(path):
-                        os.remove(path)
+            # If not already processing, start processing
+            if not user_processing_status.get(user_id, False):
+                user_processing_status[user_id] = True
+                yield from process_user_queue(user_id)
             else:
-                lines = open(save_path, encoding='utf-8').read().strip().split('\n')
-                feature_list = []
-                raw_logs = []
-                for line in lines:
-                    if line.strip():
-                        features = parse_log(line)
-                        feature_list.append(features)
-                        raw_logs.append(line)
-
-            if not feature_list:
-                yield f"data: {json.dumps({'error': 'Invalid file data'})}\n\n"
-                return
-
-            for i, (features, log_data) in enumerate(zip(feature_list, raw_logs)):
-                X = np.array(features).reshape(1, -1)
-                X_scaled = scaler.transform(X)
-                X_tensor = torch.tensor(X_scaled, dtype=torch.float32).unsqueeze(1).to(device)
-
-                with torch.no_grad():
-                    outputs = model(X_tensor)
-                    pred_idx = torch.argmax(outputs, dim=1).cpu().item()
-                    stage_label = label_encoder.inverse_transform([pred_idx])[0]
-
-                yield f"data: {json.dumps({'log_index': i, 'stage_label': stage_label})}\n\n"
-                time.sleep(0.5)  # 0.5s delay for real-time simulation
-
-            if os.path.exists(save_path):
-                os.remove(save_path)
+                print(f"[Backend] User {user_id} already processing, file added to queue")
 
         except Exception as e:
+            print(f"[Backend] General error: {str(e)}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            user_processing_status[user_id] = False
 
     return Response(generate(), mimetype='text/event-stream')
+
+def process_user_queue(user_id):
+    continuous_log_index = 0  # Maintain continuous indexing across files
+
+    try:
+        while user_file_queues[user_id]:
+            # Process the next file in the queue
+            file_info = user_file_queues[user_id].popleft()
+            current_file_path = file_info['path']
+            original_filename = file_info['original_name']
+
+            print(f"[Backend] Processing file: {current_file_path}")
+            yield f"data: {json.dumps({'status': 'file_started', 'filename': original_filename})}\n\n"
+
+            is_pcap = current_file_path.lower().endswith('.pcap')
+            temp_csv_path = None
+
+            try:
+                if is_pcap:
+                    csv_filename = f"{uuid.uuid4()}.csv"
+                    temp_csv_path = os.path.join('Uploads', csv_filename)
+                    backend_dir = os.path.dirname(os.path.dirname(__file__))
+                    cicflowmeter_dir = os.path.join(backend_dir, 'cicflowmeter')
+
+                    if platform.system() == 'Windows':
+                        venv_activate = os.path.join(cicflowmeter_dir, '.venv', 'Scripts', 'activate.bat')
+                    else:
+                        venv_activate = os.path.join(cicflowmeter_dir, '.venv', 'bin', 'activate')
+
+                    print(f"[Backend] Running CICFlowMeter for {current_file_path}")
+                    if platform.system() == 'Windows':
+                        cmd = f'"{venv_activate}" && cicflowmeter -f "{current_file_path}" -c "{temp_csv_path}"'
+                    else:
+                        cmd = f'. "{venv_activate}" && cicflowmeter -f "{current_file_path}" -c "{temp_csv_path}"'
+
+                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+                    print(f"[Backend] CICFlowMeter STDOUT: {result.stdout}")
+                    print(f"[Backend] CICFlowMeter STDERR: {result.stderr}")
+                    print(f"[Backend] CICFlowMeter Return code: {result.returncode}")
+
+                    if result.returncode != 0:
+                        yield f"data: {json.dumps({'error': f'CICFlowMeter failed for {original_filename}'})}\n\n"
+                        continue
+
+                    df = pd.read_csv(temp_csv_path)
+                    df['Flow ID'] = 0
+                    df = df.rename(columns=column_mapping)
+                    new_df = pd.DataFrame({col: df.get(col, 0) for col in desired_columns})
+                    feature_list = [parse_csv_row(row) for _, row in new_df.iterrows()]
+                    raw_logs = [row.to_json() for _, row in new_df.iterrows()]
+                else:
+                    print(f"[Backend] Reading CSV file: {current_file_path}")
+                    with open(current_file_path, 'r', encoding='utf-8') as f:
+                        lines = f.read().strip().split('\n')
+
+                    feature_list = []
+                    raw_logs = []
+                    for line in lines:
+                        if line.strip():
+                            features = parse_log(line)
+                            feature_list.append(features)
+                            raw_logs.append(line)
+
+                if not feature_list:
+                    print(f"[Backend] Error: Invalid file data in {current_file_path}")
+                    yield f"data: {json.dumps({'error': f'Invalid file data in {original_filename}'})}\n\n"
+                    continue
+
+                # Process each log entry with continuous indexing
+                for i, (features, log_data) in enumerate(zip(feature_list, raw_logs)):
+                    X = np.array(features).reshape(1, -1)
+                    X_scaled = scaler.transform(X)
+                    X_tensor = torch.tensor(X_scaled, dtype=torch.float32).unsqueeze(1).to(device)
+
+                    with torch.no_grad():
+                        outputs = model(X_tensor)
+                        pred_idx = torch.argmax(outputs, dim=1).cpu().item()
+                        stage_label = label_encoder.inverse_transform([pred_idx])[0]
+
+                    yield f"data: {json.dumps({'log_index': continuous_log_index,'stage_label': stage_label,'filename': original_filename,'file_log_index': i,'queue_remaining': len(user_file_queues[user_id])})}\n\n"
+
+                    continuous_log_index += 1
+                    time.sleep(0.5)  # 0.5s delay for real-time simulation
+
+                # Send file completion signal
+                yield f"data: {json.dumps({'status': 'file_completed', 'filename': original_filename, 'total_logs': len(feature_list)})}\n\n"
+
+            except Exception as e:
+                print(f"[Backend] Error processing file {current_file_path}: {str(e)}")
+                yield f"data: {json.dumps({'error': f'Error processing {original_filename}: {str(e)}'})}\n\n"
+            finally:
+                # Clean up files
+                for path in [current_file_path, temp_csv_path]:
+                    if path and os.path.exists(path):
+                        try:
+                            os.remove(path)
+                            print(f"[Backend] Cleaned up file: {path}")
+                        except OSError as e:
+                            print(f"[Backend] Failed to remove file {path}: {str(e)}")
+
+        # All files processed
+        yield f"data: {json.dumps({'status': 'all_completed', 'total_logs_processed': continuous_log_index})}\n\n"
+
+    except Exception as e:
+        print(f"[Backend] Error in process_user_queue: {str(e)}")
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    finally:
+        # Clear user processing status
+        user_processing_status[user_id] = False
+        if user_id in user_file_queues:
+            del user_file_queues[user_id]
+            print(f"[Backend] Cleared queue for user: {user_id}")
+
+@upload.route('/queue-status', methods=['GET'])
+@jwt_required()
+def get_queue_status():
+    current_user = get_jwt_identity()
+
+    if isinstance(current_user, dict):
+        user_id = current_user.get('user_id')
+    else:
+        user_id = current_user
+
+    if not user_id:
+        return jsonify({'error': 'Invalid user identifier'}), 400
+
+    # Get the user's queue, default to an empty deque if not exists
+    user_queue = user_file_queues.get(user_id, deque())
+    queue_length = len(user_queue)
+    is_processing = user_processing_status.get(user_id, False)
+
+    # Build list of queued file names
+    queue_files = [file_info['original_name'] for file_info in user_queue]
+
+    print(f"[Backend] Queue status for user {user_id}: length={queue_length}, is_processing={is_processing}, queue_files={queue_files}")
+
+    return jsonify({
+        'queue_length': queue_length,
+        'is_processing': is_processing,
+        'queue_files': queue_files
+    })
