@@ -20,7 +20,6 @@ train_df = pd.read_csv("../data/DSRL-APT-2023.csv")
 columns_to_drop = ["Flow ID", "Src IP", "Src Port", "Dst IP", "Dst Port", "Protocol", "Timestamp", "Activity"]
 train_features = train_df.drop(columns=columns_to_drop)
 
-# Loại bỏ ánh xạ mức độ rủi ro, giữ nguyên nhãn giai đoạn tấn công
 train_labels_raw = train_df["Stage"]
 
 # ======= ENCODING =======

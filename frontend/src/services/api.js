@@ -274,52 +274,92 @@ export const simulate = (file, onData, onError) => {
   formData.append('file', file);
 
   console.log('[Simulate API] Sending simulate request', { filename: file.name });
-  const response = fetch(`${BASE_URL}/simulate`, {
-    method: 'POST',
-    body: formData,
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
-    },
-  });
 
-  const eventSourcePromise = response.then(res => {
-    if (!res.ok) throw new Error('Network response was not ok');
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    function process() {
-      reader.read().then(({ done, value }) => {
-        if (done) {
-          onError?.('Stream ended');
-          return;
+  return new Promise((resolve, reject) => {
+    fetch(`${BASE_URL}/simulate`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
         }
-        buffer += decoder.decode(value);
-        let lines = buffer.split('\n\n');
-        buffer = lines.pop(); // Giữ phần chưa hoàn thành
 
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
-            const data = JSON.parse(line.replace('data: ', ''));
-            if (data.error) {
-              onError?.(data.error);
-            } else {
-              onData(data);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        function processStream() {
+          reader.read().then(({ done, value }) => {
+            if (done) {
+              console.log('[Simulate API] Stream ended');
+              resolve({ close: () => {} });
+              return;
             }
-          }
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop(); // Keep incomplete data
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.replace('data: ', ''));
+                  console.log('[Simulate API] Received data:', data);
+                  if (data.error) {
+                    onError(data.error);
+                  } else {
+                    onData(data);
+                  }
+                } catch (e) {
+                  console.error('[Simulate API] Error parsing data:', e, line);
+                  onError(e.message);
+                }
+              }
+            }
+            processStream();
+          }).catch((err) => {
+            console.error('[Simulate API] Stream error:', err);
+            onError(err.message);
+            reject(err);
+          });
         }
-        process();
-      }).catch(err => onError?.(err));
-    }
-    process();
 
-    return {
-      close: () => reader.cancel(), // Phương thức đóng stream
-    };
-  }).catch(err => {
-    onError?.(err);
-    return { close: () => {} }; // Trả về object giả nếu lỗi
+        processStream();
+
+        return {
+          close: () => {
+            reader.cancel();
+            console.log('[Simulate API] Stream closed');
+          },
+        };
+      })
+      .catch((err) => {
+        console.error('[Simulate API] Fetch error:', err);
+        onError(err.message);
+        reject(err);
+      });
   });
-
-  return eventSourcePromise;
 };
+
+export const getQueueStatus = async () => {
+  console.log('[Queue Status API] Fetching queue status');
+  try {
+    const response = await api.get('/queue-status');
+    console.log('[Queue Status API] Raw response:', response);
+    const normalizedResponse = {
+      ...response,
+      queue_files: Array.isArray(response.queue_files) ? response.queue_files : [],
+    };
+    console.log('[Queue Status API] Normalized queue status:', normalizedResponse);
+    return normalizedResponse;
+  } catch (error) {
+    console.error('[Queue Status API] Error fetching queue status:', error);
+    throw error;
+  }
+};
+
+export default api;

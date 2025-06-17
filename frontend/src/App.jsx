@@ -6,7 +6,6 @@ import UploadLogs from './pages/UploadLogs';
 import UploadDetails from './pages/UploadDetails';
 import UploadHistory from './pages/UploadHistory';
 import Simulation from './pages/Simulation';
-import NotFound from './pages/NotFound';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
@@ -62,7 +61,6 @@ export default function App() {
                   <Route path="/users" element={<ProtectedRoute adminOnly={true}><UserManagement /></ProtectedRoute>} />
                   <Route path="/users/:userId" element={<ProtectedRoute adminOnly={true}><UserEdit /></ProtectedRoute>} />
                   <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
-                  <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
             </div>
