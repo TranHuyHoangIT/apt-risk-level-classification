@@ -5,19 +5,29 @@ import torch
 import torch.nn as nn
 import numpy as np
 import joblib
-# import pandas as pd
+import json
+import pandas as pd
 
 model_bp = Blueprint('model', __name__)
 
-# ====== LOAD SCALER, LABEL_ENCODER ======
+# ====== LOAD SCALER, LABEL_ENCODER, PCA, CONFIG ======
 scaler = joblib.load('model_trained/scaler.pkl')
 label_encoder = joblib.load('model_trained/label_encoder.pkl')
+pca = joblib.load('model_trained/pca.pkl')
+
+# Tải config siêu tham số
+with open('model_trained/model_config.json', 'r') as f:
+    config = json.load(f)
+best_params = config['best_params']
+input_dim = config['input_dim']
+output_dim = config['output_dim']
+
 
 # ====== MODEL ======
 class LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dim=128, output_dim=5, num_layers=2):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers, dropout_rate):
         super(LSTM, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=0.3)
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=dropout_rate)
         self.fc = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x):
@@ -25,13 +35,20 @@ class LSTM(nn.Module):
         output = self.fc(lstm_out[:, -1, :])
         return output
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-input_dim = scaler.n_features_in_
-model = LSTM(input_dim).to(device)
-model.load_state_dict(torch.load('model_trained/lstm_dsrl.pth', map_location=device))
+model = LSTM(
+    input_dim=input_dim,
+    hidden_dim=best_params['hidden_dim'],
+    output_dim=output_dim,
+    num_layers=best_params['num_layers'],
+    dropout_rate=best_params['dropout_rate']
+).to(device)
+model.load_state_dict(torch.load('model_trained/lstm_dsrl.pth', map_location=device, weights_only=True))
 model.eval()
 
-__all__ = ['model', 'scaler', 'label_encoder', 'parse_log', 'parse_csv_row', 'desired_columns', 'column_mapping', 'device']
+__all__ = ['model', 'scaler', 'label_encoder', 'pca', 'parse_log', 'parse_csv_row', 'desired_columns', 'column_mapping',
+           'device']
 
 # ====== COLUMN MAPPING FOR CICFlowMeter CSV ======
 desired_columns = [
@@ -142,13 +159,20 @@ column_mapping = {
     'idle_min': 'Idle Min'
 }
 
+
 # ====== PARSE LOG ======
 def parse_log(log_str):
-    parts = log_str.strip().split(',')
-    if len(parts) < 8:
-        raise ValueError("Log không đủ cột")
-    features = [float(x) if x != '' else 0.0 for x in parts[7:]]
-    return np.array(features)
+    try:
+        parts = log_str.strip().split(',')
+        if len(parts) < 8:
+            raise ValueError("Log không đủ cột")
+        features = [float(x) if x != '' else 0.0 for x in parts[7:]]
+        if len(features) != 76:
+            raise ValueError(f"Expected 76 features, got {len(features)}")
+        return np.array(features)
+    except Exception as e:
+        raise ValueError(f"Error parsing log: {str(e)}")
+
 
 # ====== PARSE CSV ROW ======
 def parse_csv_row(row):
@@ -161,7 +185,10 @@ def parse_csv_row(row):
         except (ValueError, TypeError):
             value = 0.0
         features.append(value)
+    if len(features) != 76:
+        raise ValueError(f"Expected 76 features, got {len(features)}")
     return np.array(features)
+
 
 @model_bp.route('/predict', methods=['POST'])
 @jwt_required()
@@ -171,17 +198,31 @@ def predict():
     if not data or 'log' not in data:
         return jsonify({'error': 'Missing log'}), 400
 
-    X = parse_log(data['log']).reshape(1, -1)
-    X_scaled = scaler.transform(X)
-    X_tensor = torch.tensor(X_scaled, dtype=torch.float32).unsqueeze(1).to(device)
+    try:
+        # Parse log và chuyển thành DataFrame
+        X = parse_log(data['log']).reshape(1, -1)
+        feature_columns = scaler.feature_names_in_
+        X_df = pd.DataFrame(X, columns=feature_columns)
 
-    with torch.no_grad():
-        outputs = model(X_tensor)
-        pred_idx = torch.argmax(outputs, dim=1).cpu().item()
-        stage_label = label_encoder.inverse_transform([pred_idx])[0]
+        # Chuẩn hóa và áp dụng PCA
+        X_scaled = scaler.transform(X_df)
+        X_pca = pca.transform(X_scaled)
+        X_tensor = torch.tensor(X_pca, dtype=torch.float32).unsqueeze(1).to(device)
 
-    pred = Prediction(upload_id=None, log_data=data['log'], predicted_label=stage_label)
-    db.session.add(pred)
-    db.session.commit()
+        # Dự đoán
+        with torch.no_grad():
+            outputs = model(X_tensor)
+            pred_idx = torch.argmax(outputs, dim=1).cpu().item()
+            stage_label = label_encoder.inverse_transform([pred_idx])[0]
 
-    return jsonify({'stage_label': stage_label})
+        # Lưu dự đoán
+        pred = Prediction(upload_id=None, log_data=data['log'], predicted_label=stage_label)
+        db.session.add(pred)
+        db.session.commit()
+
+        return jsonify({'stage_label': stage_label})
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f"Prediction failed: {str(e)}"}), 500

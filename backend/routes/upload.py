@@ -11,9 +11,10 @@ from models import db, Upload, Prediction, StageSummary
 from flask import Blueprint, request, jsonify, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from collections import deque
-from .model import model, scaler, label_encoder, parse_log, parse_csv_row, desired_columns, column_mapping, device
+from .model import model, scaler, label_encoder, pca, parse_log, parse_csv_row, desired_columns, column_mapping, device
 
 upload = Blueprint('upload', __name__)
+
 
 @upload.route('/upload-logs', methods=['POST'])
 @jwt_required()
@@ -45,9 +46,15 @@ def upload_logs():
     db.session.add(upload_entry)
     db.session.commit()
 
+    # Chuyển feature_list thành DataFrame với tên cột từ scaler
     X = np.vstack(feature_list)
-    X_scaled = scaler.transform(X)
-    X_tensor = torch.tensor(X_scaled, dtype=torch.float32).unsqueeze(1).to(device)
+    feature_columns = scaler.feature_names_in_  # Lấy tên cột từ scaler
+    X_df = pd.DataFrame(X, columns=feature_columns)
+
+    # Chuẩn hóa và áp dụng PCA
+    X_scaled = scaler.transform(X_df)
+    X_pca = pca.transform(X_scaled)
+    X_tensor = torch.tensor(X_pca, dtype=torch.float32).unsqueeze(1).to(device)
 
     with torch.no_grad():
         outputs = model(X_tensor)
@@ -69,6 +76,7 @@ def upload_logs():
     results = [{'log_index': i, 'stage_label': label} for i, label in enumerate(stage_labels)]
     return jsonify({'upload_id': upload_entry.id, 'results': results})
 
+
 @upload.route('/upload-pcap', methods=['POST'])
 @jwt_required()
 def upload_pcap():
@@ -89,7 +97,10 @@ def upload_pcap():
     csv_save_path = os.path.join('Uploads', csv_filename)
 
     cicflowmeter_dir = os.path.join(os.path.dirname(__file__), 'cicflowmeter')
-    venv_activate = os.path.join(cicflowmeter_dir, '.venv', 'bin', 'activate') if platform.system() != 'Windows' else os.path.join(cicflowmeter_dir, '.venv', 'Scripts', 'activate.bat')
+    venv_activate = os.path.join(cicflowmeter_dir, '.venv', 'bin',
+                                 'activate') if platform.system() != 'Windows' else os.path.join(cicflowmeter_dir,
+                                                                                                 '.venv', 'Scripts',
+                                                                                                 'activate.bat')
 
     if platform.system() == 'Windows':
         cmd = f'"{venv_activate}" && cicflowmeter -f "{pcap_save_path}" -c "{csv_save_path}"'
@@ -121,9 +132,15 @@ def upload_pcap():
     db.session.add(upload_entry)
     db.session.commit()
 
+    # Chuyển feature_list thành DataFrame với tên cột từ scaler
     X = np.vstack(feature_list)
-    X_scaled = scaler.transform(X)
-    X_tensor = torch.tensor(X_scaled, dtype=torch.float32).unsqueeze(1).to(device)
+    feature_columns = scaler.feature_names_in_
+    X_df = pd.DataFrame(X, columns=feature_columns)
+
+    # Chuẩn hóa và áp dụng PCA
+    X_scaled = scaler.transform(X_df)
+    X_pca = pca.transform(X_scaled)
+    X_tensor = torch.tensor(X_pca, dtype=torch.float32).unsqueeze(1).to(device)
 
     with torch.no_grad():
         outputs = model(X_tensor)
@@ -149,6 +166,7 @@ def upload_pcap():
     results = [{'log_index': i, 'stage_label': label} for i, label in enumerate(stage_labels)]
     return jsonify({'upload_id': upload_entry.id, 'results': results})
 
+
 @upload.route('/upload-history', methods=['GET'])
 @jwt_required()
 def upload_history():
@@ -170,6 +188,7 @@ def upload_history():
     } for u in uploads]
     return jsonify(results)
 
+
 @upload.route('/upload-details/<int:upload_id>', methods=['GET'])
 @jwt_required()
 def upload_details(upload_id):
@@ -189,6 +208,7 @@ def upload_details(upload_id):
         'created_at': p.created_at.strftime('%Y-%m-%d %H:%M:%S')
     } for p in predictions]
     return jsonify(results)
+
 
 @upload.route('/stage-stats', methods=['GET'])
 @jwt_required()
@@ -219,6 +239,7 @@ def stage_stats():
         'stage_overview': stage_overview
     })
 
+
 @upload.route('/Uploads', methods=['GET'])
 @jwt_required()
 def get_uploads():
@@ -243,6 +264,7 @@ def get_uploads():
 
 user_file_queues = {}
 user_processing_status = {}
+
 
 @upload.route('/simulate', methods=['POST'])
 @jwt_required()
@@ -307,6 +329,7 @@ def simulate():
             user_processing_status[user_id] = False
 
     return Response(generate(), mimetype='text/event-stream')
+
 
 def process_user_queue(user_id):
     continuous_log_index = 0  # Maintain continuous indexing across files
@@ -378,15 +401,18 @@ def process_user_queue(user_id):
                 # Process each log entry with continuous indexing
                 for i, (features, log_data) in enumerate(zip(feature_list, raw_logs)):
                     X = np.array(features).reshape(1, -1)
-                    X_scaled = scaler.transform(X)
-                    X_tensor = torch.tensor(X_scaled, dtype=torch.float32).unsqueeze(1).to(device)
+                    feature_columns = scaler.feature_names_in_
+                    X_df = pd.DataFrame(X, columns=feature_columns)
+                    X_scaled = scaler.transform(X_df)
+                    X_pca = pca.transform(X_scaled)
+                    X_tensor = torch.tensor(X_pca, dtype=torch.float32).unsqueeze(1).to(device)
 
                     with torch.no_grad():
                         outputs = model(X_tensor)
                         pred_idx = torch.argmax(outputs, dim=1).cpu().item()
                         stage_label = label_encoder.inverse_transform([pred_idx])[0]
 
-                    yield f"data: {json.dumps({'log_index': continuous_log_index,'stage_label': stage_label,'filename': original_filename,'file_log_index': i,'queue_remaining': len(user_file_queues[user_id])})}\n\n"
+                    yield f"data: {json.dumps({'log_index': continuous_log_index, 'stage_label': stage_label, 'filename': original_filename, 'file_log_index': i, 'queue_remaining': len(user_file_queues[user_id])})}\n\n"
 
                     continuous_log_index += 1
                     time.sleep(0.5)  # 0.5s delay for real-time simulation
@@ -420,6 +446,7 @@ def process_user_queue(user_id):
             del user_file_queues[user_id]
             print(f"[Backend] Cleared queue for user: {user_id}")
 
+
 @upload.route('/queue-status', methods=['GET'])
 @jwt_required()
 def get_queue_status():
@@ -441,7 +468,8 @@ def get_queue_status():
     # Build list of queued file names
     queue_files = [file_info['original_name'] for file_info in user_queue]
 
-    print(f"[Backend] Queue status for user {user_id}: length={queue_length}, is_processing={is_processing}, queue_files={queue_files}")
+    print(
+        f"[Backend] Queue status for user {user_id}: length={queue_length}, is_processing={is_processing}, queue_files={queue_files}")
 
     return jsonify({
         'queue_length': queue_length,

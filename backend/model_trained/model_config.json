@@ -1,0 +1,1 @@
+{"best_params": {"hidden_dim": 256, "num_layers": 2, "dropout_rate": 0.45325719541888865, "lr": 0.004182731422271832, "batch_size": 128}, "input_dim": 35, "output_dim": 5, "pca_components": 35}

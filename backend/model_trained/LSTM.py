@@ -11,9 +11,37 @@ from sklearn.metrics import precision_score, recall_score, f1_score, classificat
 from imblearn.over_sampling import SMOTE
 import optuna
 import joblib
+import json
+import random
+import os
 
 # ======= CẤU HÌNH =======
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Cố định seed để tái lập
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    optuna.seed = seed
+
+SEED = 42
+set_seed(SEED)
+
+# Hàm chuyển đổi dữ liệu thành JSON serializable
+def convert_to_json_serializable(obj):
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: convert_to_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_json_serializable(i) for i in obj]
+    return obj
 
 # ======= LOAD DATA =======
 train_df = pd.read_csv("../data/DSRL-APT-2023.csv")
@@ -38,14 +66,14 @@ joblib.dump(scaler, "scaler.pkl")
 
 # ======= CHIA DỮ LIỆU =======
 X_train_scaled, X_temp_scaled, y_train, y_temp = train_test_split(
-    X_scaled, train_labels, test_size=0.3, stratify=train_labels, random_state=42
+    X_scaled, train_labels, test_size=0.3, stratify=train_labels, random_state=SEED
 )
 X_val_scaled, X_test_scaled, y_val, y_test = train_test_split(
-    X_temp_scaled, y_temp, test_size=0.5, stratify=y_temp, random_state=42
+    X_temp_scaled, y_temp, test_size=0.5, stratify=y_temp, random_state=SEED
 )
 
 # ======= CÂN BẰNG DỮ LIỆU =======
-smote = SMOTE(sampling_strategy='auto', random_state=42)
+smote = SMOTE(sampling_strategy='auto', random_state=SEED)
 X_train_resampled, y_train_resampled = smote.fit_resample(X_train_scaled, y_train)
 
 # ======= PCA =======
@@ -53,6 +81,9 @@ pca = PCA(n_components=0.95)
 X_train_pca = pca.fit_transform(X_train_resampled)
 X_val_pca = pca.transform(X_val_scaled)
 X_test_pca = pca.transform(X_test_scaled)
+
+# Lưu PCA
+joblib.dump(pca, "pca.pkl")
 
 # ======= MÔ HÌNH LSTM =======
 class APTLSTM(nn.Module):
@@ -95,21 +126,17 @@ def evaluate_model(model, loader, num_classes):
     all_preds = np.array(all_preds)
     all_labels = np.array(all_labels)
 
-    # Tính các chỉ số cho từng lớp
     precision = precision_score(all_labels, all_preds, average=None, zero_division=0)
     recall = recall_score(all_labels, all_preds, average=None, zero_division=0)
     f1 = f1_score(all_labels, all_preds, average=None, zero_division=0)
 
-    # Tạo dictionary chứa kết quả
     metrics = {
         'precision': {label_encoder.classes_[i]: precision[i] for i in range(num_classes)},
         'recall': {label_encoder.classes_[i]: recall[i] for i in range(num_classes)},
         'f1': {label_encoder.classes_[i]: f1[i] for i in range(num_classes)}
     }
 
-    # Tạo báo cáo chi tiết
     report = classification_report(all_labels, all_preds, target_names=label_encoder.classes_, zero_division=0, output_dict=False)
-
     return metrics, all_labels, all_preds, report
 
 # ======= HÀM TỐI ƯU SIÊU THAM SỐ =======
@@ -175,6 +202,18 @@ study.optimize(objective, n_trials=10)
 best_params = study.best_params
 print("Best hyperparameters:", best_params)
 
+# Chuyển đổi config thành JSON serializable
+config = convert_to_json_serializable({
+    'best_params': best_params,
+    'input_dim': X_train_pca.shape[1],
+    'output_dim': len(label_encoder.classes_),
+    'pca_components': pca.n_components_
+})
+
+# Lưu siêu tham số
+with open('model_config.json', 'w') as f:
+    json.dump(config, f)
+
 # ======= HUẤN LUYỆN MÔ HÌNH CUỐI CÙNG =======
 X_train_tensor = torch.tensor(X_train_pca, dtype=torch.float32).unsqueeze(1)
 y_train_tensor = torch.tensor(y_train_resampled, dtype=torch.long)
@@ -232,7 +271,7 @@ for epoch in range(epochs):
             break
 
 # ======= ĐÁNH GIÁ CUỐI CÙNG =======
-model.load_state_dict(torch.load("lstm_dsrl.pth"))
+model.load_state_dict(torch.load("lstm_dsrl.pth", map_location=device, weights_only=True))
 metrics, _, _, report = evaluate_model(model, test_loader, num_classes=len(label_encoder.classes_))
 
 print("== Kết quả đánh giá trên tập test ==")

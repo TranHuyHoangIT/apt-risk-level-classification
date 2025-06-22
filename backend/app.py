@@ -21,7 +21,10 @@ CORS(app, resources={
     }
 })
 
+# Khi dùng db trong windows
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://TranHuyHoang:04112003thh%23@localhost/apt'
+
+# Khi dùng db trong ubuntu
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://hoangtran:04112003thh#@localhost/apt'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.urandom(24).hex()
