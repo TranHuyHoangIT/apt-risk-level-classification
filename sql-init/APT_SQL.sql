@@ -1,5 +1,3 @@
-USE apt;
-
 -- Bảng users
 CREATE TABLE users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -43,14 +41,12 @@ CREATE TABLE stage_summary (
 );
 
 INSERT INTO users (username, email, password_hash, role, created_at, updated_at)
-VALUES (
-    'admin',
-    'admin@gmail.com',
-    '$2b$12$dCDH4YE76PH8Z8AVsUy7RuCTouyswJVtlSJ7XgzpVzWVe4ipONzhW', 
-    'admin',
-    NOW(),
-    NOW()
-);
+VALUES 
+    ('admin', 'admin@gmail.com', '$2b$12$dCDH4YE76PH8Z8AVsUy7RuCTouyswJVtlSJ7XgzpVzWVe4ipONzhW', 'admin', NOW(), NOW()),
+    ('user1', 'user1@gmail.com', '$2b$12$OnvHq3f7yDWr0bzB4W7pCu7oMjBM7pfOAFgJLNr/.ZJ0.K7ThC4iO', 'user', NOW(), NOW());
 
-SELECT * FROM users;
+
+
+
+
 

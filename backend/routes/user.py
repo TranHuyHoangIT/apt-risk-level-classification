@@ -1,11 +1,12 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, User
+from .auth import get_current_user
 import bcrypt
 
 user = Blueprint('user', __name__)
 
-@user.route('/users', methods=['GET', 'OPTIONS'])
+@user.route('/api/users', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_users():
     print(f"[Users] Handling {request.method} request for /users")
@@ -14,7 +15,7 @@ def get_users():
         return '', 200
 
     try:
-        current_user = get_jwt_identity()
+        current_user = get_current_user()
         if current_user['role'] != 'admin':
             print("[Users] Unauthorized access attempt")
             return jsonify({'error': 'Admin access required'}), 403
@@ -33,7 +34,7 @@ def get_users():
         print(f"[Users] Error: {e}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
-@user.route('/users/<int:user_id>', methods=['GET', 'OPTIONS'])
+@user.route('/api/users/<int:user_id>', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_user(user_id):
     print(f"[User] Handling {request.method} request for /users/{user_id}")
@@ -42,7 +43,7 @@ def get_user(user_id):
         return '', 200
 
     try:
-        current_user = get_jwt_identity()
+        current_user = get_current_user()
         if current_user['role'] != 'admin':
             print("[User] Unauthorized access attempt")
             return jsonify({'error': 'Admin access required'}), 403
@@ -60,7 +61,7 @@ def get_user(user_id):
         print(f"[User] Error: {e}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
-@user.route('/users/<int:user_id>', methods=['PUT', 'OPTIONS'])
+@user.route('/api/users/<int:user_id>', methods=['PUT', 'OPTIONS'])
 @jwt_required()
 def update_user(user_id):
     print(f"[User] Handling {request.method} request for /users/{user_id}")
@@ -69,7 +70,7 @@ def update_user(user_id):
         return '', 200
 
     try:
-        current_user = get_jwt_identity()
+        current_user = get_current_user()
         if current_user['role'] != 'admin':
             print("[User] Unauthorized access attempt")
             return jsonify({'error': 'Admin access required'}), 403
@@ -111,7 +112,7 @@ def update_user(user_id):
         print(f"[User] Error: {e}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
-@user.route('/users/<int:user_id>', methods=['DELETE', 'OPTIONS'])
+@user.route('/api/users/<int:user_id>', methods=['DELETE', 'OPTIONS'])
 @jwt_required()
 def delete_user(user_id):
     print(f"[User] Handling {request.method} request for /users/{user_id}")
@@ -120,7 +121,7 @@ def delete_user(user_id):
         return '', 200
 
     try:
-        current_user = get_jwt_identity()
+        current_user = get_current_user()
         if current_user['role'] != 'admin':
             print("[User] Unauthorized access attempt")
             return jsonify({'error': 'Admin access required'}), 403

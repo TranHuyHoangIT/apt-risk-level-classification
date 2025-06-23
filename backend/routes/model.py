@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Prediction
+from .auth import get_current_user
 import torch
 import torch.nn as nn
 import numpy as np
@@ -190,10 +191,10 @@ def parse_csv_row(row):
     return np.array(features)
 
 
-@model_bp.route('/predict', methods=['POST'])
+@model_bp.route('/api/predict', methods=['POST'])
 @jwt_required()
 def predict():
-    current_user = get_jwt_identity()
+    current_user = get_current_user()
     data = request.get_json()
     if not data or 'log' not in data:
         return jsonify({'error': 'Missing log'}), 400

@@ -9,17 +9,18 @@ import json
 import time
 from models import db, Upload, Prediction, StageSummary
 from flask import Blueprint, request, jsonify, Response
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from collections import deque
 from .model import model, scaler, label_encoder, pca, parse_log, parse_csv_row, desired_columns, column_mapping, device
+from .auth import get_current_user
 
 upload = Blueprint('upload', __name__)
 
 
-@upload.route('/upload-logs', methods=['POST'])
+@upload.route('/api/upload-logs', methods=['POST'])
 @jwt_required()
 def upload_logs():
-    current_user = get_jwt_identity()
+    current_user = get_current_user()
     if 'file' not in request.files:
         return jsonify({'error': 'Missing file'}), 400
 
@@ -77,10 +78,10 @@ def upload_logs():
     return jsonify({'upload_id': upload_entry.id, 'results': results})
 
 
-@upload.route('/upload-pcap', methods=['POST'])
+@upload.route('/api/upload-pcap', methods=['POST'])
 @jwt_required()
 def upload_pcap():
-    current_user = get_jwt_identity()
+    current_user = get_current_user()
     if 'file' not in request.files:
         return jsonify({'error': 'Missing file'}), 400
 
@@ -167,10 +168,10 @@ def upload_pcap():
     return jsonify({'upload_id': upload_entry.id, 'results': results})
 
 
-@upload.route('/upload-history', methods=['GET'])
+@upload.route('/api/upload-history', methods=['GET'])
 @jwt_required()
 def upload_history():
-    current_user = get_jwt_identity()
+    current_user = get_current_user()
     user_id = current_user['user_id']
     role = current_user['role']
 
@@ -189,10 +190,10 @@ def upload_history():
     return jsonify(results)
 
 
-@upload.route('/upload-details/<int:upload_id>', methods=['GET'])
+@upload.route('/api/upload-details/<int:upload_id>', methods=['GET'])
 @jwt_required()
 def upload_details(upload_id):
-    current_user = get_jwt_identity()
+    current_user = get_current_user()
     user_id = current_user['user_id']
     role = current_user['role']
 
@@ -210,10 +211,10 @@ def upload_details(upload_id):
     return jsonify(results)
 
 
-@upload.route('/stage-stats', methods=['GET'])
+@upload.route('/api/stage-stats', methods=['GET'])
 @jwt_required()
 def stage_stats():
-    current_user = get_jwt_identity()
+    current_user = get_current_user()
     user_id = current_user['user_id']
     role = current_user['role']
 
@@ -240,10 +241,10 @@ def stage_stats():
     })
 
 
-@upload.route('/Uploads', methods=['GET'])
+@upload.route('/api/Uploads', methods=['GET'])
 @jwt_required()
 def get_uploads():
-    current_user = get_jwt_identity()
+    current_user = get_current_user()
     user_id = current_user['user_id']
     role = current_user['role']
 
@@ -266,10 +267,10 @@ user_file_queues = {}
 user_processing_status = {}
 
 
-@upload.route('/simulate', methods=['POST'])
+@upload.route('/api/simulate', methods=['POST'])
 @jwt_required()
 def simulate():
-    current_user = get_jwt_identity()
+    current_user = get_current_user()
     print(f"[Backend] Current user: {current_user}")
 
     # Extract a hashable user identifier
@@ -447,10 +448,10 @@ def process_user_queue(user_id):
             print(f"[Backend] Cleared queue for user: {user_id}")
 
 
-@upload.route('/queue-status', methods=['GET'])
+@upload.route('/api/queue-status', methods=['GET'])
 @jwt_required()
 def get_queue_status():
-    current_user = get_jwt_identity()
+    current_user = get_current_user()
 
     if isinstance(current_user, dict):
         user_id = current_user.get('user_id')

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
+from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity, get_jwt
 from models import db, User
 import bcrypt
 from datetime import timedelta
@@ -9,7 +9,7 @@ auth = Blueprint('auth', __name__)
 # ====== JWT SETUP ======
 jwt = JWTManager()
 
-@auth.route('/login', methods=['POST', 'OPTIONS'])
+@auth.route('/api/login', methods=['POST', 'OPTIONS'])
 def login():
     print(f"[Login] Handling {request.method} request for /login")
     if request.method == 'OPTIONS':
@@ -35,9 +35,14 @@ def login():
         return jsonify({'error': 'Invalid password'}), 401
 
     access_token = create_access_token(
-        identity={'user_id': user.id, 'role': user.role},
+        identity=str(user.id),
+        additional_claims={
+            'user_id': user.id,
+            'role': user.role
+        },
         expires_delta=timedelta(days=1)
     )
+
     print(f"[Login] Login successful for {username}")
     return jsonify({
         'message': 'Login successful',
@@ -45,7 +50,7 @@ def login():
         'user': {'id': user.id, 'username': user.username, 'role': user.role}
     }), 200
 
-@auth.route('/register', methods=['POST', 'OPTIONS'])
+@auth.route('/api/register', methods=['POST', 'OPTIONS'])
 def register():
     print(f"[Register] Handling {request.method} request for /register")
     if request.method == 'OPTIONS':
@@ -76,7 +81,14 @@ def register():
     print(f"[Register] User {username} registered successfully")
     return jsonify({'message': 'User registered successfully'}), 201
 
-@auth.route('/profile', methods=['GET', 'OPTIONS'])
+def get_current_user():
+    claims = get_jwt()
+    return {
+        'user_id': claims.get('user_id'),
+        'role': claims.get('role')
+    }
+
+@auth.route('/api/profile', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_profile():
     print(f"[Profile] Handling {request.method} request for /profile")
@@ -85,7 +97,7 @@ def get_profile():
         return '', 200
 
     try:
-        current_user = get_jwt_identity()
+        current_user = get_current_user()
         user = User.query.get_or_404(current_user['user_id'])
         print(f"[Profile] Fetched profile for user {user.username}")
         return jsonify({
@@ -99,7 +111,7 @@ def get_profile():
         print(f"[Profile] Error: {e}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
-@auth.route('/profile', methods=['PUT', 'OPTIONS'])
+@auth.route('/api/profile', methods=['PUT', 'OPTIONS'])
 @jwt_required()
 def update_profile():
     print(f"[Profile] Handling {request.method} request for /profile")
@@ -108,7 +120,7 @@ def update_profile():
         return '', 200
 
     try:
-        current_user = get_jwt_identity()
+        current_user = get_current_user()
         user = User.query.get_or_404(current_user['user_id'])
         data = request.get_json()
         print(f"[Profile] Update data: {data}")
@@ -142,7 +154,7 @@ def update_profile():
         print(f"[Profile] Error: {e}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
-@auth.route('/change-password', methods=['POST', 'OPTIONS'])
+@auth.route('/api/change-password', methods=['POST', 'OPTIONS'])
 @jwt_required()
 def change_password():
     print(f"[Change-Password] Handling {request.method} request for /change-password")
@@ -151,7 +163,7 @@ def change_password():
         return '', 200
 
     try:
-        current_user = get_jwt_identity()
+        current_user = get_current_user()
         user = User.query.get_or_404(current_user['user_id'])
         data = request.get_json()
         print(f"[Change-Password] Request data: {data}")
