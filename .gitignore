@@ -1,7 +1,12 @@
-.env .env.dev .env.prod .env.development .env.production
-
 node_modules/
 
 backend/pycache/ frontend/build/
 
 *.log *.pid
+
+.env
+.env.*
+**/.env
+**/.env.*
+*.env
+*.env.*
