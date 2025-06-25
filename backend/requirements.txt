@@ -17,5 +17,4 @@ optuna~=4.3.0
 scikit-learn~=1.6.1
 imblearn~=0.0
 imbalanced-learn~=0.12.3
-gunicorn==20.1.0
 torch==2.3.1
