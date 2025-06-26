@@ -23,16 +23,14 @@ export default function UploadLogs() {
         const result = await uploadPcap(file);
         if (result.results) {
           const processedResults = result.results.map((res) => {
-            // Parse log_data (stored as JSON string by backend)
-            const logData = JSON.parse(res.log_data || '{}');
+            const logData = res.log_data ? res.log_data.split(',') : [];
             let row = {};
-            ALL_TABLE_HEADERS.forEach((header) => {
-              row[header] = logData[header] || '';
+            ALL_TABLE_HEADERS.forEach((header, index) => {
+              row[header] = logData[index] != null ? logData[index].toString() : '';
             });
             row.stage_label = res.stage_label;
             return row;
           });
-
           setResults(processedResults);
           setMessage('Upload và phân loại PCAP thành công!');
         } else {

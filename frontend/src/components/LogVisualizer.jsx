@@ -121,7 +121,7 @@ export default function LogVisualizer({ logs }) {
                 <tr key={rowIndex} className="hover:bg-gray-50">
                   {ALL_TABLE_HEADERS.map((col, colIndex) => (
                     <td key={colIndex} className="py-1 px-3 border whitespace-nowrap">
-                      {row[col] !== undefined && row[col] !== null ? row[col].toString() : ''}
+                      {row[col] != null ? row[col].toString() : ''}
                     </td>
                   ))}
                 </tr>

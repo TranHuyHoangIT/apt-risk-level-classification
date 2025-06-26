@@ -97,16 +97,15 @@ def upload_pcap():
     csv_filename = f"{uuid.uuid4()}.csv"
     csv_save_path = os.path.join('Uploads', csv_filename)
 
-    cicflowmeter_dir = os.path.join(os.path.dirname(__file__), 'cicflowmeter')
-    venv_activate = os.path.join(cicflowmeter_dir, '.venv', 'bin',
-                                 'activate') if platform.system() != 'Windows' else os.path.join(cicflowmeter_dir,
-                                                                                                 '.venv', 'Scripts',
-                                                                                                 'activate.bat')
+    cicflowmeter_dir = os.path.join(os.path.dirname(__file__), '..', 'cicflowmeter')
+    venv_activate = os.path.join(cicflowmeter_dir, '.venv', 'bin', 'activate') if platform.system() != 'Windows' else os.path.join(cicflowmeter_dir, '.venv', 'Scripts', 'activate.bat')
 
     if platform.system() == 'Windows':
         cmd = f'"{venv_activate}" && cicflowmeter -f "{pcap_save_path}" -c "{csv_save_path}"'
     else:
         cmd = f'. "{venv_activate}" && cicflowmeter -f "{pcap_save_path}" -c "{csv_save_path}"'
+
+    print("cmd là: ", cmd)
 
     try:
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
@@ -124,7 +123,8 @@ def upload_pcap():
     new_df.to_csv(refactored_csv_path, index=False, header=False)
 
     feature_list = [parse_csv_row(row) for _, row in new_df.iterrows()]
-    raw_logs = [row.to_json() for _, row in new_df.iterrows()]
+    # raw_logs = [row.to_json(orient='values', force_ascii=False) for _, row in new_df.iterrows()]
+    raw_logs = [','.join(map(str, row)) for _, row in new_df.iterrows()]
 
     if not feature_list:
         return jsonify({'error': 'Invalid CSV data'}), 400
@@ -164,7 +164,7 @@ def upload_pcap():
         if os.path.exists(path):
             os.remove(path)
 
-    results = [{'log_index': i, 'stage_label': label} for i, label in enumerate(stage_labels)]
+    results = [{'log_index': i, 'stage_label': label, 'log_data': log} for i, (label, log) in enumerate(zip(stage_labels, raw_logs))]
     return jsonify({'upload_id': upload_entry.id, 'results': results})
 
 

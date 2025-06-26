@@ -140,6 +140,8 @@ else:
 
 load_dotenv(dotenv_path=dotenv_path)
 print(f"[ENV] Loaded config from: {dotenv_path}")
+print("DATABASE_URL:", os.getenv('DATABASE_URL'))
+print("FRONTEND_URL", os.getenv('FRONTEND_URL'))
 
 app = Flask(__name__)
 
