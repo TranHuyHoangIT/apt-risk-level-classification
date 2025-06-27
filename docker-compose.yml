@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   mysql:
     image: mysql:8.0
@@ -5,10 +7,9 @@ services:
       - ./.env
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=apt
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./sql-init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
@@ -23,9 +24,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     env_file:
+      - ./.env  
       - ./backend/.env.prod
-    environment:
-      - FLASK_ENV=production
     depends_on:
       mysql:
         condition: service_healthy
